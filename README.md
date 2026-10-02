@@ -59,7 +59,7 @@ The API and both evals call the same `rag/pipeline.py`, so the evals measure wha
 - **chunk size** 200 / 350 / 500 / 800 tokens × **overlap** 0 / 50 / 100
 - **retrieval mode** vector / keyword (BM25) / hybrid (Reciprocal Rank Fusion)
 - **top-k** 1 / 3 / 5 / 8
-- **refusal threshold**: for each chunking, the cosine cutoff that best separates answerable from unanswerable questions
+- **refusal threshold**: for each chunking, the highest cosine cutoff that still answers every answerable question, minus a 0.03 margin. Questions below it get "I don't know" without an LLM call.
 
 **Selection rule.** The sweep keeps every config whose hit rate is within one question of the best. From those it picks the one that sends the fewest context tokens to the LLM, then the highest MRR. A bigger k almost always raises recall but costs tokens and adds noise to the prompt; this rule makes that trade-off explicit.
 
@@ -67,16 +67,32 @@ Embeddings are cached in `.cache/`, so re-running the sweep or adding grid point
 
 ## Results
 
-> Fill this in from `results/*.md` after running the pipeline on your keys (see below).
+OpenAI `text-embedding-3-small` (768 dims) + `gpt-4.1-mini`, 50-question eval set. The judge is `gpt-4.1-mini`.
 
-| | Baseline (500/50, vector, k=5) | Tuned |
-|---|---|---|
-| Retrieval hit rate | | |
-| MRR | | |
-| Context tokens / query | | |
-| Answer accuracy | | |
-| Faithfulness | | |
-| Correct refusals (unanswerable) | | |
+| | Baseline | Tuned | Change |
+|---|---|---|---|
+| Config | 500/50 tokens, vector, k=5, threshold 0.30 | 350/50 tokens, vector, k=3, threshold 0.224 | |
+| Retrieval hit rate | 98% (@5) | 98% (@3) | same recall with fewer chunks |
+| MRR | 0.790 | 0.850 | +0.06 |
+| Context tokens / query | 1,678 | 744 | **−56%** |
+| Answer accuracy (judge) | 82% | **94%** | +12 pts |
+| Faithfulness (judge) | 100% | 98% | −1 question* |
+| Citation accuracy | 82% | **98%** | +16 pts |
+| False refusals | 15% | **2%** | −13 pts |
+| Correct refusals (unanswerable) | 100% | 100% | |
+| Latency p50 / p95 | 2.7s / 5.1s | 2.6s / 5.2s | |
+
+Full reports: [`results/tuning.md`](results/tuning.md), [`results/retrieval_eval.md`](results/retrieval_eval.md), [`results/answer_eval.md`](results/answer_eval.md); the baseline run is in [`results/baseline/`](results/baseline/).
+
+### What the evals found
+1. **The refusal threshold was the biggest source of error, not retrieval.** All 6 baseline false refusals came from the `MIN_SIMILARITY=0.30` guard. The right chunk was retrieved each time, but its similarity was 0.26–0.29. The LLM never needed that guard.
+2. **On-topic unanswerable questions can't be filtered by similarity.** "Does Tidepool offer a Gantt chart?" scores 0.65, higher than most answerable questions. Separating the two by threshold peaks at about 84% accuracy, while the prompt-level "I don't know" rule refused all 10 unanswerable questions. So the threshold is now tuned as a cheap off-topic filter that must never block a real question, not as a classifier.
+3. **Smaller chunks with a smaller k cut context by 56% at the same recall.** Each chunk is more focused, which raised MRR and citation accuracy.
+4. **Hybrid search ranks better; the cost rule picked vector anyway.** Keyword search alone gets the right chunk first 90% of the time vs 75% for vector, because questions often contain exact terms like "PayPal" or "SMS". Hybrid (RRF) at 350 tokens reaches MRR 0.90 vs 0.85 at k=3, and 100% recall at k=5. It tied vector on hit@3 but used about 10% more context, so the cost-first rule chose vector. If ranking quality matters more than tokens, `RETRIEVAL_MODE=hybrid` is the better setting. The rule is a choice, and the full grid is in `results/tuning.csv`.
+
+### Remaining failures (tuned)
+- *"What happens to tasks nobody has touched in a month?"* is a **retrieval miss** caused by vocabulary mismatch: the docs say "ripples not updated in 30 days". Query rewriting or HyDE would be the next experiment.
+- \*Three answers were graded "partial" or "unfaithful" for small omissions or reasonable inferences, e.g. "after the grace period data is removed". These are judge-strictness cases; with 40 questions, one question is 2.5 points.
 
 ## Run it
 

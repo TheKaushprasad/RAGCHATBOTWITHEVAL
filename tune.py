@@ -30,7 +30,7 @@ from ingest import SUPPORTED, embed_text, load
 from rag import config
 from rag.chunking import chunk_segments, count_tokens
 from rag.embeddings import embed_documents, embed_query, model_id
-from rag.evalset import RESULTS, best_threshold, first_hit_rank, load_cases, md_table, utf8_stdout
+from rag.evalset import RESULTS, first_hit_rank, load_cases, md_table, safe_threshold, utf8_stdout
 
 CACHE = Path(".cache")
 RRF_K = 60  # same constant as hybrid_search() in schema.sql
@@ -149,7 +149,7 @@ def main() -> int:
     max_k = max(args.ks)
 
     rows: list[dict] = []
-    thresholds: dict[tuple[int, int], tuple[float, float]] = {}
+    thresholds: dict[tuple[int, int], tuple[float, int]] = {}  # (min_similarity, unanswerable blocked)
     for size in args.sizes:
         for overlap in args.overlaps:
             if overlap >= size // 2:
@@ -157,10 +157,10 @@ def main() -> int:
             chunks, vectors, bm25 = build_index(segments, size, overlap, cache)
             print(f"chunks {size}/{overlap}: {len(chunks)} chunks")
 
-            # Top-1 vector similarity for answerable vs unanswerable questions → refusal threshold.
+            # Refusal threshold: never block an answerable question; count what it filters for free.
             top1 = {c["question"]: float((vectors @ qvecs[c["question"]]).max()) for c in cases}
-            thresholds[(size, overlap)] = best_threshold(
-                [top1[c["question"]] for c in pos_cases], [top1[c["question"]] for c in neg_cases])
+            thr = safe_threshold([top1[c["question"]] for c in pos_cases])
+            thresholds[(size, overlap)] = (thr, sum(top1[c["question"]] < thr for c in neg_cases))
 
             for mode in args.modes:
                 ranks: dict[str, list[int]] = {}
@@ -194,8 +194,8 @@ def main() -> int:
     best_hit = max(r["hit_rate"] for r in rows)
     eligible = [r for r in rows if r["hit_rate"] >= best_hit - args.tolerance]
     best = min(eligible, key=lambda r: (r["avg_context_tokens"], -r["mrr"], -r["hit_rate"]))
-    thr, thr_acc = thresholds[(best["chunk_tokens"], best["overlap"])]
-    best = {**best, "min_similarity": round(thr, 3), "refusal_accuracy": round(thr_acc, 4)}
+    thr, blocked = thresholds[(best["chunk_tokens"], best["overlap"])]
+    best = {**best, "min_similarity": thr, "unanswerable_filtered": blocked, "unanswerable_total": len(neg_cases)}
     # keyword-only isn't served by the API; map it to hybrid, which includes the keyword ranking.
     serve_mode = "hybrid" if best["mode"] == "keyword" else best["mode"]
 
@@ -215,8 +215,8 @@ def main() -> int:
     print(f"Best hit rate anywhere: {best_hit:.0%}")
     print(f"Chosen: {best['chunk_tokens']}/{best['overlap']} tokens, {best['mode']}, k={best['k']} → "
           f"hit {best['hit_rate']:.0%}, MRR {best['mrr']:.3f}, ~{best['avg_context_tokens']} context tokens")
-    print(f"Refusal threshold {best['min_similarity']} separates answerable/unanswerable with "
-          f"{best['refusal_accuracy']:.0%} accuracy")
+    print(f"Refusal threshold {best['min_similarity']}: blocks 0 answerable questions and filters "
+          f"{blocked}/{len(neg_cases)} unanswerable ones before the LLM (the prompt guard handles the rest)")
     print(f"\nApply in .env, then re-run `python ingest.py`:\n{env}\n\nReport: results/tuning.md")
     return 0
 
@@ -238,13 +238,13 @@ def write_report(rows, best, env, thresholds, n_pos, n_neg, args) -> None:
 
     by_chunk = []
     k5 = 5 if 5 in args.ks else max(args.ks)
-    for (size, overlap), (thr, acc) in thresholds.items():
+    for (size, overlap), (thr, blocked) in thresholds.items():
         cells = {"chunks": f"{size}/{overlap}"}
         for mode in args.modes:
             r = next(r for r in rows if (r["chunk_tokens"], r["overlap"], r["mode"], r["k"]) == (size, overlap, mode, k5))
             cells[f"{mode} hit@{k5}"] = f"{r['hit_rate']:.0%}"
-        cells["refusal thr"] = f"{thr:.3f}"
-        cells["refusal acc"] = f"{acc:.0%}"
+        cells["min_similarity"] = f"{thr:.3f}"
+        cells["off-topic filtered"] = f"{blocked}/{n_neg}"
         by_chunk.append(cells)
 
     md = f"""# RAG tuning report
@@ -254,9 +254,9 @@ Selection rule: hit rate within {args.tolerance:.1%} of the best, then fewest co
 
 ## Chosen config
 
-| chunk tokens | overlap | mode | top-k | hit rate | MRR | context tokens / query | refusal threshold | refusal accuracy |
+| chunk tokens | overlap | mode | top-k | hit rate | MRR | context tokens / query | min_similarity | unanswerable filtered pre-LLM |
 |---|---|---|---|---|---|---|---|---|
-| {best['chunk_tokens']} | {best['overlap']} | {best['mode']} | {best['k']} | {best['hit_rate']:.0%} | {best['mrr']:.3f} | {best['avg_context_tokens']} | {best['min_similarity']} | {best['refusal_accuracy']:.0%} |
+| {best['chunk_tokens']} | {best['overlap']} | {best['mode']} | {best['k']} | {best['hit_rate']:.0%} | {best['mrr']:.3f} | {best['avg_context_tokens']} | {best['min_similarity']} | {best['unanswerable_filtered']}/{n_neg} |
 
 ```env
 {env}
@@ -266,8 +266,9 @@ Selection rule: hit rate within {args.tolerance:.1%} of the best, then fewest co
 
 {md_table(by_chunk, list(by_chunk[0]))}
 
-"refusal thr" is the top-1 cosine similarity cutoff that best separates answerable from unanswerable
-questions for that chunking; "refusal acc" is how often that cutoff classifies them correctly.
+"min_similarity" is the highest top-1 cosine cutoff that still answers every answerable question (minus a
+0.03 margin). On-topic unanswerable questions score like answerable ones, so the threshold only filters
+clearly off-topic queries; the prompt guard catches the rest (measured by eval_answers.py).
 
 ## Best config per mode and k
 

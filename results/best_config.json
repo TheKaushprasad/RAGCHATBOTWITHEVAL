@@ -1,0 +1,13 @@
+{
+  "chunk_tokens": 350,
+  "overlap": 50,
+  "mode": "vector",
+  "k": 3,
+  "chunks": 22,
+  "hit_rate": 0.975,
+  "mrr": 0.85,
+  "avg_context_tokens": 744,
+  "min_similarity": 0.224,
+  "unanswerable_filtered": 1,
+  "unanswerable_total": 10
+}

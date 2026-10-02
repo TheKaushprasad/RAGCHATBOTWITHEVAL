@@ -47,6 +47,16 @@ def best_threshold(pos: list[float], neg: list[float]) -> tuple[float, float]:
     return (winners[len(winners) // 2], best)
 
 
+def safe_threshold(pos: list[float], margin: float = 0.03) -> float:
+    """Highest cutoff that refuses no answerable question, minus a safety margin.
+
+    The threshold is an off-topic filter that saves an LLM call, not the main refusal mechanism:
+    on-topic-but-unanswerable questions score as high as answerable ones, and the prompt guard
+    handles those. So it must never block a real question; that's what this optimizes for.
+    """
+    return round(max(0.0, min(pos) - margin), 3) if pos else 0.0
+
+
 def md_table(rows: list[dict], cols: list[str]) -> str:
     out = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
     for r in rows:
