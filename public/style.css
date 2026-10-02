@@ -1,27 +1,27 @@
 :root {
-  --bg: #f7f7f5;
+  --bg: #f7f7fc;
   --panel: #ffffff;
-  --text: #1c1c1a;
-  --muted: #6b6b66;
-  --border: #e3e2de;
-  --accent: #2f5bd3;
-  --accent-soft: #e8eefc;
-  --user: #1c1c1a;
+  --text: #14152a;
+  --muted: #62657a;
+  --border: #e6e5f2;
+  --accent: #5b4ef0;
+  --accent-soft: #eeecfe;
+  --user: #5b4ef0;
   --user-text: #ffffff;
   --error: #b42318;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #161615;
-    --panel: #1f1f1d;
-    --text: #ececea;
-    --muted: #9a9a94;
-    --border: #33332f;
-    --accent: #7c9bf0;
-    --accent-soft: #232b40;
-    --user: #ececea;
-    --user-text: #161615;
+    --bg: #0f1020;
+    --panel: #17182c;
+    --text: #ecebff;
+    --muted: #a2a4bd;
+    --border: #2b2d48;
+    --accent: #9b90ff;
+    --accent-soft: #252448;
+    --user: #6d61f5;
+    --user-text: #ffffff;
     --error: #f97066;
   }
 }
@@ -33,7 +33,7 @@ html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 15px/1.55 "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 .app {
@@ -53,7 +53,8 @@ body {
   padding: 20px 0 12px;
   border-bottom: 1px solid var(--border);
 }
-.top h1 { margin: 0; font-size: 18px; font-weight: 600; }
+.brand { display: inline-flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none;
+  font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
 .sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 
 .docs-toggle {

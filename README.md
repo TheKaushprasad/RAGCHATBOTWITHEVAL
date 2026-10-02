@@ -1,6 +1,6 @@
-# RAG Chatbot with Evals and Tuning
+# Queryva: RAG Chatbot with Evals and Tuning
 
-**Live demo: [ragevaltest.vercel.app](https://ragevaltest.vercel.app)**. It's a chatbot over my AI Product Management notes (70 pages: LLMs, prompt and context engineering, RAG, MCP, ML, agentic AI). Try *"What is the swiss cheese capability model?"* or *"regression vs classification?"*. Ask *"Which is the best LLM to use right now?"* and it says the notes don't cover that instead of guessing. You can also open **Documents** and upload your own Word, PDF or markdown file to chat with it.
+**Live demo: [ragevaltest.vercel.app](https://ragevaltest.vercel.app)** (chat at [/chat](https://ragevaltest.vercel.app/chat/)). Queryva is a chatbot over my AI Product Management notes (70 pages: LLMs, prompt and context engineering, RAG, MCP, ML, agentic AI). Try *"What is the swiss cheese capability model?"* or *"regression vs classification?"*. Ask *"Which is the best LLM to use right now?"* and it says the notes don't cover that instead of guessing. You can also open **Documents** and upload your own Word, PDF or markdown file to chat with it.
 
 Answers cite their source passages, and the bot says "I don't know" when the documents don't cover the question. Quality is measured, not eyeballed: a **100-question golden dataset** grades every answer for correctness, faithfulness and retrieval quality, and each failure is diagnosed as a retrieval or a generation problem.
 
@@ -204,7 +204,7 @@ docs/                the indexed corpus (ai-pm-notes.pdf)
 examples/tidepool/   synthetic-corpus case study: docs, 50-question eval set, tuning results
 results/             golden-dataset eval reports
 supabase/schema.sql  table, indexes, namespaces, match_documents + hybrid_search
-public/              chat UI + documents panel
+public/              landing page (index.html) + chat UI (chat/) + documents panel
 ```
 
 ## Notes and limitations

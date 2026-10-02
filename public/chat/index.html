@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Queryva · Chat</title>
+  <meta name="description" content="Ask questions about your documents and get answers with citations." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <div>
+        <a class="brand" href="/" aria-label="Queryva home">
+          <img src="/favicon.svg" alt="" width="28" height="28" />
+          <span>Queryva</span>
+        </a>
+        <p class="sub">Answers come only from the indexed documents, with citations.</p>
+      </div>
+      <button id="docs-toggle" class="docs-toggle" type="button" aria-expanded="false" aria-controls="docs">
+        Documents <span id="docs-count" class="count"></span>
+      </button>
+    </header>
+
+    <section id="docs" class="docs" hidden>
+      <div id="drop" class="drop">
+        <input id="file" type="file" accept=".docx,.pdf,.md,.markdown,.mdx,.txt" multiple hidden />
+        <button id="pick" type="button" class="pick">Upload a document</button>
+        <span class="hint">or drop it here · DOCX, PDF, MD, TXT · <span id="limits">max 4 MB</span></span>
+      </div>
+      <p class="privacy">Uploads are private to this browser and deleted after <span id="ttl">24</span> hours.</p>
+      <div id="upload-status" class="status" role="status" aria-live="polite"></div>
+
+      <h2>Your documents</h2>
+      <ul id="uploads" class="doclist"><li class="muted">None yet.</li></ul>
+
+      <details>
+        <summary>Sample documents (<span id="sample-count">0</span>)</summary>
+        <ul id="samples" class="doclist"></ul>
+      </details>
+    </section>
+
+    <section id="log" class="log" aria-live="polite">
+      <div class="empty" id="empty">Ask a question about the documents, or upload your own.</div>
+    </section>
+
+    <form id="form" class="composer">
+      <textarea id="input" rows="1" maxlength="2000" placeholder="Ask a question…" autofocus></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+  </main>
+
+  <template id="msg-tpl">
+    <article class="msg">
+      <div class="body"></div>
+      <div class="cites"></div>
+      <div class="cite-detail" hidden></div>
+    </article>
+  </template>
+
+  <script src="/app.js"></script>
+</body>
+</html>

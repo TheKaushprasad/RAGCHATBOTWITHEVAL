@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 from rag import config, pipeline, store  # noqa: E402
 from rag.uploads import UploadError, ingest_upload, session_namespace  # noqa: E402
 
-app = FastAPI(title="RAG chatbot")
+app = FastAPI(title="Queryva")
 
 
 class ChatRequest(BaseModel):
