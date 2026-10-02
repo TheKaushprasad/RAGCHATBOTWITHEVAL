@@ -1,0 +1,11 @@
+docs/
+.env
+.venv/
+.cache/
+results/
+ingest.py
+eval.py
+eval_answers.py
+tune.py
+evals.json
+requirements-dev.txt

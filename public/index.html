@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Docs Chat</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1>Docs Chat</h1>
+      <p class="sub">Answers come only from the indexed documents, with citations.</p>
+    </header>
+
+    <section id="log" class="log" aria-live="polite">
+      <div class="empty" id="empty">Ask a question about the documents.</div>
+    </section>
+
+    <form id="form" class="composer">
+      <textarea id="input" rows="1" maxlength="2000" placeholder="Ask a question…" autofocus></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+  </main>
+
+  <template id="msg-tpl">
+    <article class="msg">
+      <div class="body"></div>
+      <div class="cites"></div>
+      <div class="cite-detail" hidden></div>
+    </article>
+  </template>
+
+  <script src="/app.js"></script>
+</body>
+</html>
