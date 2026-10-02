@@ -8,7 +8,7 @@ embeddings are cached on disk in .cache/, so re-runs are nearly free.
     python tune.py --sizes 300 500 --overlaps 50    # custom grid
     python tune.py --tolerance 0                    # demand the exact best hit rate
 
-Writes results/tuning.csv, results/tuning.md and results/best_config.json, and prints the
+Writes tuning.csv, tuning.md and best_config.json to results/<eval set>/, and prints the
 .env lines to apply the winner. Re-run ingest.py afterwards if chunk settings changed.
 
 Selection rule: among configs whose hit rate is within --tolerance of the best, pick the one
@@ -28,7 +28,7 @@ import numpy as np
 
 from rag.chunking import chunk_segments, count_tokens
 from rag.embeddings import embed_documents, embed_query, model_id
-from rag.evalset import RESULTS, first_hit_rank, load_cases, md_table, safe_threshold, utf8_stdout
+from rag.evalset import DEFAULT_EVALS, first_hit_rank, load_cases, md_table, results_dir, safe_threshold, utf8_stdout
 from rag.loaders import SUPPORTED, embed_text, load
 
 CACHE = Path(".cache")
@@ -129,7 +129,7 @@ def main() -> int:
     utf8_stdout()
     ap = argparse.ArgumentParser()
     ap.add_argument("--docs", default="docs")
-    ap.add_argument("--file", default="evals.json")
+    ap.add_argument("--file", default=DEFAULT_EVALS)
     ap.add_argument("--sizes", type=int, nargs="+", default=[200, 350, 500, 800])
     ap.add_argument("--overlaps", type=int, nargs="+", default=[0, 50, 100])
     ap.add_argument("--ks", type=int, nargs="+", default=[1, 3, 5, 8])
@@ -198,16 +198,16 @@ def main() -> int:
     # keyword-only isn't served by the API; map it to hybrid, which includes the keyword ranking.
     serve_mode = "hybrid" if best["mode"] == "keyword" else best["mode"]
 
-    RESULTS.mkdir(exist_ok=True)
-    with open(RESULTS / "tuning.csv", "w", newline="", encoding="utf-8") as f:
+    out_dir = results_dir(args.file)
+    with open(out_dir / "tuning.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
-    (RESULTS / "best_config.json").write_text(json.dumps(best, indent=2))
+    (out_dir / "best_config.json").write_text(json.dumps(best, indent=2))
 
     env = (f"CHUNK_TOKENS={best['chunk_tokens']}\nCHUNK_OVERLAP={best['overlap']}\n"
            f"RETRIEVAL_MODE={serve_mode}\nTOP_K={best['k']}\nMIN_SIMILARITY={best['min_similarity']}")
-    write_report(rows, best, env, thresholds, len(pos_cases), len(neg_cases), args)
+    write_report(rows, best, env, thresholds, len(pos_cases), len(neg_cases), args, out_dir)
 
     print(f"\n{len(rows)} configs evaluated on {len(pos_cases)} answerable + {len(neg_cases)} unanswerable "
           f"questions ({cache.calls} new embeddings; rest from cache).")
@@ -216,11 +216,11 @@ def main() -> int:
           f"hit {best['hit_rate']:.0%}, MRR {best['mrr']:.3f}, ~{best['avg_context_tokens']} context tokens")
     print(f"Refusal threshold {best['min_similarity']}: blocks 0 answerable questions and filters "
           f"{blocked}/{len(neg_cases)} unanswerable ones before the LLM (the prompt guard handles the rest)")
-    print(f"\nApply in .env, then re-run `python ingest.py`:\n{env}\n\nReport: results/tuning.md")
+    print(f"\nApply in .env, then re-run `python ingest.py`:\n{env}\n\nReport: {(out_dir / 'tuning.md').as_posix()}")
     return 0
 
 
-def write_report(rows, best, env, thresholds, n_pos, n_neg, args) -> None:
+def write_report(rows, best, env, thresholds, n_pos, n_neg, args, out_dir) -> None:
     def pct(r):
         return {**r, "hit_rate": f"{r['hit_rate']:.0%}", "mrr": f"{r['mrr']:.3f}"}
 
@@ -277,10 +277,10 @@ clearly off-topic queries; the prompt guard catches the rest (measured by eval_a
 
 {md_table([pct(r) for r in top], cols)}
 
-Full grid: `results/tuning.csv`. Keyword search here is in-memory BM25; production hybrid search uses
+Full grid: `tuning.csv` (same folder). Keyword search here is in-memory BM25; production hybrid search uses
 Postgres full-text search (`hybrid_search` in `supabase/schema.sql`), so confirm the winner with `python eval.py`.
 """
-    (RESULTS / "tuning.md").write_text(md, encoding="utf-8")
+    (out_dir / "tuning.md").write_text(md, encoding="utf-8")
 
 
 if __name__ == "__main__":

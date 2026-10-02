@@ -7,21 +7,21 @@
 
 Answerable questions count toward hit rate / MRR. Unanswerable ones (answerable: false) are used
 to check the "I don't know" threshold: their top similarity should fall below MIN_SIMILARITY.
-Writes results/retrieval_eval.md.
+Writes retrieval_eval.md to results/<eval set>/ (or examples/<x>/results/).
 """
 
 import argparse
 import time
 
 from rag import config
-from rag.evalset import RESULTS, best_threshold, first_hit_rank, load_cases, utf8_stdout
+from rag.evalset import DEFAULT_EVALS, best_threshold, first_hit_rank, load_cases, results_dir, utf8_stdout
 from rag.pipeline import retrieve
 
 
 def main() -> int:
     utf8_stdout()
     ap = argparse.ArgumentParser()
-    ap.add_argument("--file", default="evals.json")
+    ap.add_argument("--file", default=DEFAULT_EVALS)
     ap.add_argument("--k", type=int, default=config.TOP_K)
     ap.add_argument("--mode", choices=["vector", "hybrid"], default=config.RETRIEVAL_MODE)
     ap.add_argument("--min", type=float, default=None, help="fail (exit 1) if hit rate is below this, 0-1")
@@ -79,8 +79,8 @@ def main() -> int:
     print("-" * 84)
     print("\n".join(summary))
 
-    RESULTS.mkdir(exist_ok=True)
-    (RESULTS / "retrieval_eval.md").write_text(
+    out_dir = results_dir(args.file)
+    (out_dir / "retrieval_eval.md").write_text(
         f"# Retrieval eval\n\nmode=`{args.mode}` · k={args.k} · MIN_SIMILARITY={config.MIN_SIMILARITY} · "
         f"chunks {config.CHUNK_TOKENS}/{config.CHUNK_OVERLAP} · `{config.PROVIDER}:{config.EMBED_MODEL}`\n\n"
         + "\n".join(f"- {s}" for s in summary)

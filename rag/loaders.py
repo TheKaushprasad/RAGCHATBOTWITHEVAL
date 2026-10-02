@@ -21,10 +21,22 @@ def load_pdf(data: bytes) -> Segments:
     reader = PdfReader(io.BytesIO(data))
     segments = []
     for i, page in enumerate(reader.pages, start=1):
-        text = (page.extract_text() or "").strip()
+        text = page.extract_text() or ""
+        if _one_word_per_line(text):
+            # Some exporters (e.g. Google Docs) place every word separately, so plain extraction
+            # yields "What\n \nis\n \nan". Layout mode reassembles real lines.
+            text = page.extract_text(extraction_mode="layout") or ""
+            text = "\n".join(re.sub(r" {2,}", " ", ln).strip() for ln in text.splitlines())
+            text = re.sub(r"\n{3,}", "\n\n", text)
+        text = text.strip()
         if text:
             segments.append((text, {"page": i}))
     return segments
+
+
+def _one_word_per_line(text: str) -> bool:
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    return len(lines) > 20 and sum(len(ln.split()) for ln in lines) / len(lines) < 1.5
 
 
 def load_markdown(text: str) -> Segments:

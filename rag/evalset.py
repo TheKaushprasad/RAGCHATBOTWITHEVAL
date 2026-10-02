@@ -5,6 +5,18 @@ import sys
 from pathlib import Path
 
 RESULTS = Path("results")
+DEFAULT_EVALS = "evals_golden.json"
+
+
+def results_dir(eval_file: str) -> Path:
+    """Where an eval set's reports go: examples/<x>/results for archived sets, else results/<name>."""
+    p = Path(eval_file)
+    if "examples" in p.parts:
+        out = p.parent / "results"
+    else:
+        out = RESULTS / p.stem.removeprefix("evals_")
+    out.mkdir(parents=True, exist_ok=True)
+    return out
 
 
 def load_cases(path: str = "evals.json") -> list[dict]:

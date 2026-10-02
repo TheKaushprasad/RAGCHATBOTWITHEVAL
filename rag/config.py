@@ -37,7 +37,7 @@ EMBED_DIM = int(os.environ.get("EMBED_DIM", "768"))  # must match vector(768) in
 
 # Retrieval / chunking knobs. tune.py searches over these; copy its winners into .env.
 RETRIEVAL_MODE = os.environ.get("RETRIEVAL_MODE", "vector")  # "vector" or "hybrid"
-TOP_K = int(os.environ.get("TOP_K", "3"))
+TOP_K = int(os.environ.get("TOP_K", "5"))
 MIN_SIMILARITY = float(os.environ.get("MIN_SIMILARITY", "0.224"))
 CHUNK_TOKENS = int(os.environ.get("CHUNK_TOKENS", "350"))
 CHUNK_OVERLAP = int(os.environ.get("CHUNK_OVERLAP", "50"))
