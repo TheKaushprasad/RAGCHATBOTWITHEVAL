@@ -1,5 +1,7 @@
 # RAG Chatbot with Evals and Tuning
 
+**Live demo: [ragevaltest.vercel.app](https://ragevaltest.vercel.app)**. Try *"Can I pay with PayPal?"* or *"Is Tidepool SOC 2 certified?"* (the docs don't say, so it should answer "I don't know").
+
 A retrieval-augmented chatbot over PDFs and markdown. Answers come with citations to the source chunks, and the bot says "I don't know" when the documents don't cover the question. Its configuration is chosen by measurement, not guesswork: chunk size, overlap, retrieval mode, top-k and the refusal threshold all come from a tuning sweep scored against a labelled eval set.
 
 | Layer | Choice |
@@ -139,7 +141,7 @@ vercel env add SUPABASE_URL
 vercel env add SUPABASE_SERVICE_KEY
 vercel --prod
 ```
-Also add your tuned `RETRIEVAL_MODE`, `TOP_K` and `MIN_SIMILARITY`. Leave the framework preset on **Other**. `vercel.json` routes `/api/*` to FastAPI and serves `public/` statically. Ingestion, evals and tuning run locally and are excluded from the deploy.
+The tuned retrieval settings are the code defaults, so only the three keys are required. Vercel detects the FastAPI app in `api/index.py` and serves `public/` statically. Don't add an `/api` rewrite: Vercel now routes rewritten requests by their destination path, so FastAPI would see `/api/index` and return 404. Ingestion, evals and tuning run locally and are excluded from the deploy.
 
 ## Project layout
 ```

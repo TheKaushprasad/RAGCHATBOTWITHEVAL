@@ -5,8 +5,5 @@
       "maxDuration": 30,
       "includeFiles": "rag/**"
     }
-  },
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" }
-  ]
+  }
 }
