@@ -9,12 +9,35 @@
 <body>
   <main class="app">
     <header class="top">
-      <h1>Docs Chat</h1>
-      <p class="sub">Answers come only from the indexed documents, with citations.</p>
+      <div>
+        <h1>Docs Chat</h1>
+        <p class="sub">Answers come only from the indexed documents, with citations.</p>
+      </div>
+      <button id="docs-toggle" class="docs-toggle" type="button" aria-expanded="false" aria-controls="docs">
+        Documents <span id="docs-count" class="count"></span>
+      </button>
     </header>
 
+    <section id="docs" class="docs" hidden>
+      <div id="drop" class="drop">
+        <input id="file" type="file" accept=".docx,.pdf,.md,.markdown,.mdx,.txt" multiple hidden />
+        <button id="pick" type="button" class="pick">Upload a document</button>
+        <span class="hint">or drop it here · DOCX, PDF, MD, TXT · <span id="limits">max 4 MB</span></span>
+      </div>
+      <p class="privacy">Uploads are private to this browser and deleted after <span id="ttl">24</span> hours.</p>
+      <div id="upload-status" class="status" role="status" aria-live="polite"></div>
+
+      <h2>Your documents</h2>
+      <ul id="uploads" class="doclist"><li class="muted">None yet.</li></ul>
+
+      <details>
+        <summary>Sample documents (<span id="sample-count">0</span>)</summary>
+        <ul id="samples" class="doclist"></ul>
+      </details>
+    </section>
+
     <section id="log" class="log" aria-live="polite">
-      <div class="empty" id="empty">Ask a question about the documents.</div>
+      <div class="empty" id="empty">Ask a question about the documents, or upload your own.</div>
     </section>
 
     <form id="form" class="composer">

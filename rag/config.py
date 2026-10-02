@@ -43,3 +43,10 @@ CHUNK_TOKENS = int(os.environ.get("CHUNK_TOKENS", "350"))
 CHUNK_OVERLAP = int(os.environ.get("CHUNK_OVERLAP", "50"))
 
 IDK = "I don't know"
+
+# Visitor uploads (private per browser session, auto-expiring).
+UPLOAD_MAX_BYTES = int(os.environ.get("UPLOAD_MAX_BYTES", str(4 * 1024 * 1024)))  # Vercel caps request bodies at 4.5 MB
+UPLOAD_MAX_FILES = int(os.environ.get("UPLOAD_MAX_FILES", "5"))  # per session
+UPLOAD_MAX_CHUNKS = int(os.environ.get("UPLOAD_MAX_CHUNKS", "150"))  # per file (~50k tokens) - bounds embedding cost
+UPLOAD_GLOBAL_MAX_CHUNKS = int(os.environ.get("UPLOAD_GLOBAL_MAX_CHUNKS", "5000"))  # all visitors combined
+UPLOAD_TTL_HOURS = int(os.environ.get("UPLOAD_TTL_HOURS", "24"))

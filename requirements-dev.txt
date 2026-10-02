@@ -1,6 +1,4 @@
 -r requirements.txt
-pypdf>=5.0
-tiktoken>=0.8
 python-dotenv>=1.0
 uvicorn>=0.30
 numpy>=1.26

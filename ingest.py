@@ -1,4 +1,4 @@
-"""Load PDFs/markdown from docs/, chunk, embed with Gemini, upsert to Supabase.
+"""Load PDF/DOCX/markdown/text files from docs/, chunk, embed, upsert to Supabase (public namespace).
 
     python ingest.py              # incremental: only re-embeds chunks whose text changed
     python ingest.py --reset      # wipe the table first
@@ -7,64 +7,13 @@
 
 import argparse
 import hashlib
-import re
 import sys
 from pathlib import Path
 
 from rag import config
-from rag.chunking import Chunk, chunk_segments, count_tokens
+from rag.chunking import chunk_segments, count_tokens
 from rag.embeddings import model_id
-
-SUPPORTED = {".pdf", ".md", ".markdown", ".mdx", ".txt"}
-
-
-def load_pdf(path: Path) -> list[tuple[str, dict]]:
-    from pypdf import PdfReader
-
-    reader = PdfReader(str(path))
-    segments = []
-    for i, page in enumerate(reader.pages, start=1):
-        text = (page.extract_text() or "").strip()
-        if text:
-            segments.append((text, {"page": i}))
-    return segments
-
-
-def load_markdown(path: Path) -> list[tuple[str, dict]]:
-    text = path.read_text(encoding="utf-8")
-    text = re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S)  # strip YAML front matter
-    segments: list[tuple[str, dict]] = []
-    heading = ""
-    buf: list[str] = []
-    in_code = False
-
-    def flush() -> None:
-        body = "\n".join(buf).strip()
-        if body:
-            segments.append((body, {"heading": heading} if heading else {}))
-        buf.clear()
-
-    for line in text.splitlines():
-        if line.lstrip().startswith("```"):
-            in_code = not in_code
-        m = None if in_code else re.match(r"^(#{1,6})\s+(.*)", line)
-        if m:
-            flush()
-            heading = m.group(2).strip()
-        buf.append(line)  # headings stay in the text so chunks carry their section title
-    flush()
-    return segments
-
-
-def load(path: Path) -> list[tuple[str, dict]]:
-    return load_pdf(path) if path.suffix.lower() == ".pdf" else load_markdown(path)
-
-
-def embed_text(source: str, chunk: Chunk) -> str:
-    # Prefixing the file name and section gives the embedding context the chunk text may lack.
-    header = source + (f" — {chunk.meta['heading']}" if chunk.meta.get("heading") else "")
-    return f"{header}\n\n{chunk.text}"
-
+from rag.loaders import SUPPORTED, embed_text, load
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -112,6 +61,7 @@ def main() -> int:
             vectors = embed_documents([texts[i] for i in todo])
             rows = [
                 {
+                    "namespace": store.PUBLIC,
                     "source": source,
                     "chunk_index": i,
                     "page": chunks[i].meta.get("page"),

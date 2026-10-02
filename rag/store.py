@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from functools import lru_cache
 
 from supabase import Client, create_client
@@ -5,6 +6,7 @@ from supabase import Client, create_client
 from rag import config
 
 TABLE = "documents"
+PUBLIC = "public"  # shared docs from ingest.py; uploads live in "session:<uuid>" namespaces
 
 
 @lru_cache(maxsize=1)
@@ -12,41 +14,86 @@ def client() -> Client:
     return create_client(config._require("SUPABASE_URL"), config._require("SUPABASE_SERVICE_KEY"))
 
 
-def existing_hashes(source: str) -> dict[int, str]:
-    rows = client().table(TABLE).select("chunk_index,content_hash").eq("source", source).execute().data
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+# --- ingestion (public namespace) -------------------------------------------------------
+
+def existing_hashes(source: str, namespace: str = PUBLIC) -> dict[int, str]:
+    rows = (client().table(TABLE).select("chunk_index,content_hash")
+            .eq("namespace", namespace).eq("source", source).execute().data)
     return {r["chunk_index"]: r["content_hash"] for r in rows}
 
 
 def upsert_chunks(rows: list[dict], batch_size: int = 100) -> None:
     for i in range(0, len(rows), batch_size):
-        client().table(TABLE).upsert(rows[i : i + batch_size], on_conflict="source,chunk_index").execute()
+        client().table(TABLE).upsert(rows[i : i + batch_size], on_conflict="namespace,source,chunk_index").execute()
 
 
-def delete_stale(source: str, keep_count: int) -> None:
+def delete_stale(source: str, keep_count: int, namespace: str = PUBLIC) -> None:
     """Remove chunks past the new end of a source (the file got shorter)."""
-    client().table(TABLE).delete().eq("source", source).gte("chunk_index", keep_count).execute()
+    (client().table(TABLE).delete().eq("namespace", namespace).eq("source", source)
+     .gte("chunk_index", keep_count).execute())
 
 
 def delete_sources_except(sources: set[str]) -> list[str]:
-    """Remove every chunk whose source file no longer exists in docs/."""
-    rows = client().table(TABLE).select("source").execute().data
+    """Remove public chunks whose source file no longer exists in docs/."""
+    rows = client().table(TABLE).select("source").eq("namespace", PUBLIC).execute().data
     gone = sorted({r["source"] for r in rows} - sources)
     for s in gone:
-        client().table(TABLE).delete().eq("source", s).execute()
+        delete_source(s, PUBLIC)
     return gone
 
 
 def reset() -> None:
-    client().table(TABLE).delete().gte("id", 0).execute()
+    """Wipe the public docs (visitor uploads are left alone)."""
+    client().table(TABLE).delete().eq("namespace", PUBLIC).execute()
 
 
-def match(query_embedding: list[float], k: int, query_text: str | None = None, mode: str = "vector") -> list[dict]:
+# --- uploads (per-session namespaces) ---------------------------------------------------
+
+def delete_source(source: str, namespace: str) -> None:
+    client().table(TABLE).delete().eq("namespace", namespace).eq("source", source).execute()
+
+
+def purge_expired() -> None:
+    client().table(TABLE).delete().lt("expires_at", _now()).execute()
+
+
+def list_sources(namespace: str) -> list[dict]:
+    """[{source, chunks, expires_at}] for one namespace, skipping expired rows."""
+    q = client().table(TABLE).select("source,expires_at").eq("namespace", namespace)
+    if namespace != PUBLIC:
+        q = q.gt("expires_at", _now())
+    out: dict[str, dict] = {}
+    for r in q.execute().data:
+        d = out.setdefault(r["source"], {"source": r["source"], "chunks": 0, "expires_at": r["expires_at"]})
+        d["chunks"] += 1
+    return sorted(out.values(), key=lambda d: d["source"])
+
+
+def upload_chunk_count() -> int:
+    """Live uploaded chunks across all visitors (for the global abuse cap)."""
+    res = (client().table(TABLE).select("id", count="exact", head=True)
+           .neq("namespace", PUBLIC).gt("expires_at", _now()).execute())
+    return res.count or 0
+
+
+# --- retrieval --------------------------------------------------------------------------
+
+def match(query_embedding: list[float], k: int, query_text: str | None = None, mode: str = "vector",
+          session_ns: str | None = None) -> list[dict]:
+    """Top-k chunks from the public docs plus (if given) one visitor's uploads."""
     if mode == "hybrid":
         if not query_text:
             raise ValueError("hybrid search needs query_text")
         res = client().rpc("hybrid_search", {
             "query_text": query_text, "query_embedding": query_embedding, "match_count": k,
+            "session_ns": session_ns,
         }).execute()
     else:
-        res = client().rpc("match_documents", {"query_embedding": query_embedding, "match_count": k}).execute()
+        res = client().rpc("match_documents", {
+            "query_embedding": query_embedding, "match_count": k, "session_ns": session_ns,
+        }).execute()
     return res.data or []

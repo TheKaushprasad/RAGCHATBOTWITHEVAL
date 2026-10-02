@@ -1,27 +1,30 @@
 # RAG Chatbot with Evals and Tuning
 
-**Live demo: [ragevaltest.vercel.app](https://ragevaltest.vercel.app)**. Try *"Can I pay with PayPal?"* or *"Is Tidepool SOC 2 certified?"* (the docs don't say, so it should answer "I don't know").
+**Live demo: [ragevaltest.vercel.app](https://ragevaltest.vercel.app)**. Try *"Can I pay with PayPal?"* or *"Is Tidepool SOC 2 certified?"* (the docs don't say, so it should answer "I don't know"). Or open **Documents** and upload your own Word, PDF or markdown file to chat with it.
 
-A retrieval-augmented chatbot over PDFs and markdown. Answers come with citations to the source chunks, and the bot says "I don't know" when the documents don't cover the question. Its configuration is chosen by measurement, not guesswork: chunk size, overlap, retrieval mode, top-k and the refusal threshold all come from a tuning sweep scored against a labelled eval set.
+A retrieval-augmented chatbot over Word, PDF and markdown documents. Answers come with citations to the source chunks, and the bot says "I don't know" when the documents don't cover the question. Its configuration is chosen by measurement, not guesswork: chunk size, overlap, retrieval mode, top-k and the refusal threshold all come from a tuning sweep scored against a labelled eval set.
 
 | Layer | Choice |
 |---|---|
 | LLM + embeddings | OpenAI (`gpt-4.1-mini`, `text-embedding-3-small` @ 768 dims) or Google Gemini, set by `PROVIDER` |
 | Vector store | Supabase Postgres + pgvector (HNSW), plus Postgres full-text search for hybrid retrieval |
 | Backend | FastAPI, deployed as a Vercel Python function |
-| Frontend | Vanilla HTML/JS chat UI with clickable citations |
+| Frontend | Vanilla HTML/JS chat UI with clickable citations and document upload (DOCX, PDF, MD, TXT) |
 | Evals | Retrieval hit rate / MRR, LLM-judged answer accuracy and faithfulness, citation accuracy, refusal behaviour |
 
 ## Architecture
 
 ```
                        ingest.py
-docs/*.pdf|*.md ──► load ──► chunk (N tokens, M overlap) ──► embed ──► Supabase `documents`
-                                                                          ├─ embedding (HNSW)
-                                                                          └─ fts tsvector (GIN)
+docs/*.docx|pdf|md ──► load ──► chunk (N tokens, M overlap) ──► embed ──► Supabase `documents`
+                                                                             ├─ namespace 'public'
+browser ── POST /api/upload ──► same loaders/chunker/embedder ──────────────► ├─ namespace 'session:<uuid>' (expires 24h)
+                                                                             ├─ embedding (HNSW)
+                                                                             └─ fts tsvector (GIN)
 
 browser ── POST /api/chat ──► rag/pipeline.py
-                                ├─ retrieve: vector  → match_documents()
+                                ├─ retrieve (public docs + this visitor's uploads only):
+                                │            vector  → match_documents()
                                 │            hybrid  → hybrid_search()  (vector + keyword, Reciprocal Rank Fusion)
                                 ├─ guard 1: top similarity < MIN_SIMILARITY → "I don't know" (no LLM call)
                                 ├─ LLM with numbered passages; must cite [n]; guard 2: refuse if unsupported
@@ -33,6 +36,13 @@ eval_answers.py ── full pipeline + LLM judge                          ──
 ```
 
 The API and both evals call the same `rag/pipeline.py`, so the evals measure what users actually get.
+
+### Uploading your own documents
+Visitors can upload `.docx`, `.pdf`, `.md` or `.txt` files from the **Documents** panel (button or drag-and-drop).
+- **Private per browser.** The page creates a random session ID (kept in `localStorage`) and sends it as `X-Session-Id`. Uploads are stored under `session:<id>`, and the search functions only return `public` chunks plus the caller's own namespace. Other visitors can't see or delete them, and nobody can delete the sample docs through the API.
+- **Temporary.** Uploads expire after 24 hours. Expired rows are filtered out of search and purged on the next upload.
+- **Cost-bounded for a public demo.** 4 MB per file (Vercel's request cap is 4.5 MB), 5 files per visitor, 150 chunks per file, and 5,000 uploaded chunks across all visitors. All are configurable through `UPLOAD_*` env vars.
+- **Same pipeline.** Uploads go through the same loaders, chunker and embedder as `ingest.py`. Word headings, lists and tables are kept: headings become section labels on citations, and tables become `| a | b |` rows.
 
 ## Evaluation
 
@@ -149,17 +159,19 @@ api/index.py         FastAPI app (POST /api/chat, GET /api/health)
 rag/config.py        env-driven settings (provider, models, chunking, retrieval)
 rag/embeddings.py    OpenAI / Gemini embeddings, batching, retry on 429/5xx
 rag/llm.py           prompt, chat completion, citation parsing
+rag/loaders.py       DOCX / PDF / markdown / text → sections
+rag/uploads.py       visitor upload validation, limits, indexing
 rag/pipeline.py      retrieve → guard → answer (shared by API and evals)
 rag/store.py         Supabase: upsert, vector + hybrid search RPCs
 rag/chunking.py      token-bounded chunker that prefers paragraph/sentence boundaries
 rag/evalset.py       eval loading, hit logic, threshold search
-ingest.py            incremental ingestion (re-embeds only changed chunks)
+ingest.py            incremental ingestion of docs/ (re-embeds only changed chunks)
 tune.py              hyperparameter sweep
 eval.py              retrieval eval against the live index
 eval_answers.py      end-to-end answer eval with LLM judge
 evals.json           50 labelled questions
 supabase/schema.sql  table, indexes, match_documents + hybrid_search
-public/              chat UI
+public/              chat UI + documents panel
 docs/                sample corpus (replace with your own and rewrite evals.json)
 ```
 
@@ -169,3 +181,5 @@ docs/                sample corpus (replace with your own and rewrite evals.json
 - Judging with the same model that answered can be lenient. Set `JUDGE_MODEL` to a stronger model for a stricter grade.
 - Switching `PROVIDER` or `EMBED_MODEL` changes the embedding space. Chunk hashes include the model, so `python ingest.py` re-embeds everything automatically.
 - Supabase free projects pause after about a week of inactivity.
+- Scanned PDFs without a text layer aren't supported (no OCR).
+- The session ID is a capability, not authentication: anyone holding a browser's ID could read that browser's uploads. That's fine for a demo of temporary files; real user data would need accounts.

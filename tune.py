@@ -26,11 +26,10 @@ from pathlib import Path
 
 import numpy as np
 
-from ingest import SUPPORTED, embed_text, load
-from rag import config
 from rag.chunking import chunk_segments, count_tokens
 from rag.embeddings import embed_documents, embed_query, model_id
 from rag.evalset import RESULTS, first_hit_rank, load_cases, md_table, safe_threshold, utf8_stdout
+from rag.loaders import SUPPORTED, embed_text, load
 
 CACHE = Path(".cache")
 RRF_K = 60  # same constant as hybrid_search() in schema.sql

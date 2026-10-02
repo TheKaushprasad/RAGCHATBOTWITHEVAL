@@ -8,17 +8,22 @@ Segments are split into sentence-ish units, then greedily packed into chunks of 
 
 import re
 from dataclasses import dataclass, field
-
-import tiktoken
+from functools import lru_cache
 
 from rag import config
 
-_enc = tiktoken.get_encoding("cl100k_base")  # approximation of Gemini's tokenizer; good enough for sizing
+
+@lru_cache(maxsize=1)
+def _enc():
+    # Lazy: on Vercel the tokenizer file is downloaded on first use, so chat-only requests never pay for it.
+    import tiktoken
+
+    return tiktoken.get_encoding("cl100k_base")  # approximates the embedding models' tokenizers; fine for sizing
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
 
 
 def count_tokens(text: str) -> int:
-    return len(_enc.encode(text))
+    return len(_enc().encode(text))
 
 
 @dataclass
@@ -45,11 +50,11 @@ def _split_units(text: str, meta: dict, max_tokens: int, overlap: int) -> list[U
         # Keep short paragraphs, lists and code blocks whole; split long prose into sentences.
         pieces = [para] if count_tokens(para) <= max_tokens // 2 else _SENTENCE_END.split(para)
         for piece in pieces:
-            toks = _enc.encode(piece)
+            toks = _enc().encode(piece)
             # A single sentence longer than a whole chunk: hard cut on token boundaries.
             for i in range(0, len(toks), hard_cut):
                 part = toks[i : i + hard_cut]
-                units.append(Unit(_enc.decode(part), len(part), meta))
+                units.append(Unit(_enc().decode(part), len(part), meta))
     return units
 
 
@@ -81,8 +86,8 @@ def chunk_segments(
             if not tail:
                 # Last unit alone exceeds the overlap budget: carry its final `overlap` tokens.
                 last = current[-1]
-                toks = _enc.encode(last.text)[-overlap:]
-                tail = [Unit(_enc.decode(toks), len(toks), last.meta)]
+                toks = _enc().encode(last.text)[-overlap:]
+                tail = [Unit(_enc().decode(toks), len(toks), last.meta)]
                 tail_size = len(toks)
             # Drop overlap that would leave no room for the incoming unit.
             while tail and tail_size + unit.tokens + 2 > max_tokens:
