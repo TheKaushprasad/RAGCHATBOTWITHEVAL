@@ -97,3 +97,24 @@ def match(query_embedding: list[float], k: int, query_text: str | None = None, m
             "query_embedding": query_embedding, "match_count": k, "session_ns": session_ns,
         }).execute()
     return res.data or []
+
+
+# --- answer feedback --------------------------------------------------------------------
+
+FEEDBACK = "feedback"
+
+
+def save_feedback(row: dict) -> None:
+    """Insert or update the rating for one answer (keyed by answer_id)."""
+    client().table(FEEDBACK).upsert({**row, "updated_at": _now()}, on_conflict="answer_id").execute()
+
+
+def delete_feedback(answer_id: str) -> None:
+    client().table(FEEDBACK).delete().eq("answer_id", answer_id).execute()
+
+
+def list_feedback(rating: int | None = None, limit: int = 1000) -> list[dict]:
+    q = client().table(FEEDBACK).select("*").order("created_at", desc=True).limit(limit)
+    if rating is not None:
+        q = q.eq("rating", rating)
+    return q.execute().data

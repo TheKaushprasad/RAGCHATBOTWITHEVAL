@@ -91,6 +91,108 @@ function renderAnswer(node, data) {
   }
 }
 
+// --- answer feedback (thumbs up / down) -------------------------------------------------
+
+const THUMB_UP = '<path d="M7 10v11H4V10zM7 10l4-7c1.7 0 2.7 1.2 2.4 2.8L12.8 9H19a2 2 0 0 1 2 2.3l-1.2 7.4A2.7 2.7 0 0 1 17.2 21H7"/>';
+const THUMB_DOWN = '<path d="M17 14V3h3v11zM17 14l-4 7c-1.7 0-2.7-1.2-2.4-2.8l.6-3.2H5a2 2 0 0 1-2-2.3l1.2-7.4A2.7 2.7 0 0 1 6.8 3H17"/>';
+
+function renderFeedback(node, question, data) {
+  const answerId = crypto.randomUUID();
+  let rating = 0;
+
+  const bar = document.createElement("div");
+  bar.className = "feedback";
+  const label = document.createElement("span");
+  label.className = "fb-label";
+  label.textContent = "Was this helpful?";
+
+  const makeThumb = (value, svg, name) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "thumb";
+    b.setAttribute("aria-label", name);
+    b.setAttribute("aria-pressed", "false");
+    b.title = name;
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg>`; // static icon markup only
+    b.addEventListener("click", () => vote(rating === value ? 0 : value));
+    return b;
+  };
+  const up = makeThumb(1, THUMB_UP, "Helpful");
+  const down = makeThumb(-1, THUMB_DOWN, "Not helpful");
+  const status = document.createElement("span");
+  status.className = "fb-status";
+  status.setAttribute("role", "status");
+
+  // Optional reason, shown after a thumbs down.
+  const form = document.createElement("form");
+  form.className = "fb-form";
+  form.hidden = true;
+  const reason = document.createElement("input");
+  reason.type = "text";
+  reason.maxLength = 1000;
+  reason.placeholder = "What was wrong? (optional)";
+  reason.setAttribute("aria-label", "What was wrong with this answer?");
+  const sendReason = document.createElement("button");
+  sendReason.type = "submit";
+  sendReason.textContent = "Send";
+  form.append(reason, sendReason);
+
+  async function save(value, comment = null) {
+    await api("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        answer_id: answerId,
+        rating: value,
+        comment,
+        question,
+        answer: data.answer,
+        sources: data.citations.map((c) => ({ source: c.source, chunk_index: c.chunk_index, page: c.page })),
+        grounded: data.grounded,
+      }),
+    });
+  }
+
+  async function vote(value) {
+    const previous = rating;
+    rating = value;
+    up.setAttribute("aria-pressed", String(value === 1));
+    down.setAttribute("aria-pressed", String(value === -1));
+    form.hidden = value !== -1;
+    status.textContent = "";
+    try {
+      await save(value);
+      status.textContent = value === 1 ? "Thanks!" : value === -1 ? "Thanks — tell us what was wrong?" : "";
+      if (value === -1) reason.focus();
+    } catch (err) {
+      rating = previous;
+      up.setAttribute("aria-pressed", String(previous === 1));
+      down.setAttribute("aria-pressed", String(previous === -1));
+      form.hidden = previous !== -1;
+      status.textContent = `Couldn't save feedback: ${err.message}`;
+    }
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const comment = reason.value.trim();
+    if (!comment) return;
+    sendReason.disabled = true;
+    try {
+      await save(-1, comment);
+      form.hidden = true;
+      status.textContent = "Thanks — that helps improve the answers.";
+    } catch (err) {
+      status.textContent = `Couldn't save feedback: ${err.message}`;
+    } finally {
+      sendReason.disabled = false;
+    }
+  });
+
+  bar.append(label, up, down, status);
+  node.append(bar, form);
+}
+
 async function ask(message) {
   addMessage("user").querySelector(".body").textContent = message;
   const bot = addMessage("bot pending");
@@ -106,6 +208,7 @@ async function ask(message) {
     bot.classList.remove("pending");
     bot.querySelector(".body").textContent = "";
     renderAnswer(bot, data);
+    renderFeedback(bot, message, data);
   } catch (err) {
     bot.classList.remove("pending");
     bot.classList.add("error");

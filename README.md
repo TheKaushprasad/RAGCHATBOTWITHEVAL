@@ -101,6 +101,20 @@ Reports: [`results/golden/answer_eval.md`](results/golden/answer_eval.md) (k=3) 
 4. **The judge needs auditing.** In one case it marked an answer as missing "very complex logic" when the answer opens with exactly that. 8 answers flipped from *yes* to *partial* between runs without a clear cause. With n≈16 per topic, one question moves a topic score 6 points. Treat small differences as noise and read the failure list.
 5. **The golden set needs review too.** In Q034 (the Maruti Swift claim), the source notes are inconsistent: parts 350,000 + labour 30,000 sums to 380,000, but the example output says `repair_cost: 390000`. The golden answer inherited the inconsistency, so the bot can't be right on that question. Fixing the source or the golden answer is the right move, not tuning the bot.
 
+## User feedback: closing the loop
+
+Every answer in the chat has 👍 / 👎 buttons. A thumbs-down opens an optional "What was wrong?" box.
+- **What's stored:** each rating goes to a `feedback` table in Supabase with the question, the answer, the cited sources, whether it was an "I don't know", and the model and retrieval settings that produced it. That makes ratings comparable across config changes.
+- **Changing your mind:** a visitor can change or remove their vote; it's one row per answer, keyed by an ID the browser generates.
+- **No session ID is stored**, so ratings aren't linked to a visitor or their uploads.
+
+```bash
+python feedback_report.py
+python feedback_report.py --export golden_candidates.json
+```
+
+The first command prints the helpful rate, splits it by config, and lists every thumbs-down with the user's comment and the cited pages. The second turns those thumbs-downs into draft golden-dataset entries. Each draft includes the bot's answer and the user's comment; you write the correct `answer`, then add it to `evals_golden.json`. Real user failures become permanent eval cases, so the next `eval_answers.py` run checks they stay fixed.
+
 ## Case study: tuning on a synthetic corpus
 
 Before the AI PM notes, I tuned the pipeline on a fictional product's docs ("Tidepool", 8 files) with a 50-question eval set. Because it's fictional, the model can't answer from general knowledge. That work is kept in [`examples/tidepool/`](examples/tidepool/) and set the chunking and the refusal threshold used today.
@@ -185,7 +199,7 @@ Visitors can upload `.docx`, `.pdf`, `.md` or `.txt` files from the **Documents*
 
 ## Project layout
 ```
-api/index.py         FastAPI app (chat, upload, documents, health)
+api/index.py         FastAPI app (chat, upload, documents, feedback, health)
 rag/config.py        env-driven settings (provider, models, chunking, retrieval, upload limits)
 rag/embeddings.py    OpenAI / Gemini embeddings, batching, retry on 429/5xx
 rag/llm.py           prompt, chat completion, citation parsing
@@ -198,12 +212,13 @@ rag/evalset.py       eval loading, hit logic, threshold search, results folders
 ingest.py            incremental ingestion of docs/ (re-embeds only changed chunks)
 eval_answers.py      golden-dataset answer eval with LLM judge + failure diagnosis
 eval.py              retrieval eval (hit rate / MRR; needs expected_substring labels)
+feedback_report.py   thumbs up/down summary; export thumbs-downs as golden-dataset drafts
 tune.py              hyperparameter sweep (needs expected_substring labels)
 evals_golden.json    100-question golden dataset for the AI PM notes
 docs/                the indexed corpus (ai-pm-notes.pdf)
 examples/tidepool/   synthetic-corpus case study: docs, 50-question eval set, tuning results
 results/             golden-dataset eval reports
-supabase/schema.sql  table, indexes, namespaces, match_documents + hybrid_search
+supabase/schema.sql  documents + feedback tables, indexes, namespaces, match_documents + hybrid_search
 public/              landing page (index.html) + chat UI (chat/) + documents panel
 ```
 

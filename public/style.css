@@ -229,3 +229,29 @@ body {
   cursor: pointer;
 }
 .composer button:disabled { opacity: 0.5; cursor: default; }
+
+/* --- answer feedback --- */
+.feedback { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.fb-label { color: var(--muted); font-size: 12px; margin-right: 2px; }
+.thumb {
+  display: inline-grid; place-items: center; width: 30px; height: 28px; padding: 0;
+  border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.thumb svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.thumb:hover { background: var(--accent-soft); color: var(--accent); }
+.thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.thumb[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.thumb[aria-pressed="true"] svg { fill: currentColor; fill-opacity: 0.18; }
+.fb-status { color: var(--muted); font-size: 12px; margin-left: 4px; }
+.fb-form { display: flex; gap: 6px; margin-top: 8px; }
+.fb-form[hidden] { display: none; }
+.fb-form input {
+  flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel); color: var(--text); font: inherit; font-size: 13px;
+}
+.fb-form input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.fb-form button {
+  padding: 0 12px; border: 0; border-radius: 8px; background: var(--accent); color: #fff;
+  font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.fb-form button:disabled { opacity: 0.5; }

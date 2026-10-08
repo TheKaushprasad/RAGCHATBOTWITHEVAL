@@ -1,6 +1,8 @@
 import os
 import sys
+import uuid
 from pathlib import Path
+from typing import Literal
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))  # make `rag` importable on Vercel and under uvicorn
@@ -66,6 +68,48 @@ def chat(req: ChatRequest, x_session_id: str | None = Header(default=None)) -> C
         return ChatResponse(**pipeline.answer_question(req.message.strip(), session_ns=ns))
     except Exception as e:  # quota errors, paused Supabase project, missing env vars
         raise HTTPException(status_code=502, detail=f"Upstream error: {e}") from e
+
+
+class FeedbackSource(BaseModel):
+    source: str = Field(max_length=200)
+    chunk_index: int
+    page: int | None = None
+
+
+class FeedbackRequest(BaseModel):
+    answer_id: uuid.UUID
+    rating: Literal[-1, 0, 1]  # 0 removes a previous vote
+    comment: str | None = Field(default=None, max_length=1000)
+    question: str = Field(min_length=1, max_length=2000)
+    answer: str = Field(min_length=1, max_length=8000)
+    sources: list[FeedbackSource] = Field(default_factory=list, max_length=20)
+    grounded: bool | None = None
+
+
+@app.post("/api/feedback")
+def feedback(req: FeedbackRequest) -> dict:
+    try:
+        if req.rating == 0:
+            store.delete_feedback(str(req.answer_id))
+        else:
+            store.save_feedback({
+                "answer_id": str(req.answer_id),
+                "rating": req.rating,
+                "comment": (req.comment or "").strip() or None,
+                "question": req.question,
+                "answer": req.answer,
+                "sources": [s.model_dump() for s in req.sources],
+                "grounded": req.grounded,
+                "config": {
+                    "provider": config.PROVIDER, "chat_model": config.CHAT_MODEL,
+                    "embed_model": config.EMBED_MODEL, "retrieval_mode": config.RETRIEVAL_MODE,
+                    "top_k": config.TOP_K, "min_similarity": config.MIN_SIMILARITY,
+                    "chunk_tokens": config.CHUNK_TOKENS, "chunk_overlap": config.CHUNK_OVERLAP,
+                },
+            })
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Upstream error: {e}") from e
+    return {"ok": True, "rating": req.rating}
 
 
 @app.get("/api/documents")
