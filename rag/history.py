@@ -47,8 +47,11 @@ def get_messages(user_id: str, conversation_id: str) -> list[dict]:
 
 
 def add_exchange(user_id: str, conversation_id: str, question: str, result: dict, answer_id: str) -> None:
+    # Both rows list every column: in a bulk insert PostgREST sends null (not the column default)
+    # for keys missing from a row, which would violate citations' NOT NULL.
     _db().table("messages").insert([
-        {"conversation_id": conversation_id, "user_id": user_id, "role": "user", "content": question},
+        {"conversation_id": conversation_id, "user_id": user_id, "role": "user", "content": question,
+         "citations": [], "grounded": None, "answer_id": None},
         {"conversation_id": conversation_id, "user_id": user_id, "role": "assistant",
          "content": result["answer"], "citations": result["citations"], "grounded": result["grounded"],
          "answer_id": answer_id},

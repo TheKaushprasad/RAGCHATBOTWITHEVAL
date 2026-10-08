@@ -27,7 +27,9 @@ def current_user(authorization: str | None = Header(default=None)) -> dict:
 
 
 def upstream(e: Exception) -> HTTPException:
-    return HTTPException(status_code=502, detail=f"Upstream error: {e}")
+    """Log the real error server-side; show the user a plain message (no database internals)."""
+    print(f"[queryva] upstream error: {type(e).__name__}: {e}", file=sys.stderr)
+    return HTTPException(status_code=502, detail="Something went wrong on our side. Please try again in a moment.")
 
 
 # --- models -----------------------------------------------------------------------------
@@ -108,18 +110,24 @@ def chat(req: ChatRequest, user: dict = Depends(current_user)) -> ChatResponse:
     question = req.message.strip()
     try:
         standalone = question
-        if req.conversation_id:
-            conv_id = str(req.conversation_id)
+        conv_id = str(req.conversation_id) if req.conversation_id else None
+        if conv_id:
             if not history.owns(user["id"], conv_id):
                 raise HTTPException(status_code=404, detail="Conversation not found.")
             # Follow-ups like "and how do you fix it?" are rewritten into a standalone question
             # so retrieval searches for the right thing.
             standalone = followup.rewrite(question, history.recent_turns(user["id"], conv_id))
-        else:
-            conv_id = history.create_conversation(user["id"], question)["id"]
         result = pipeline.answer_question(standalone, session_ns=user_namespace(user["id"]))
         answer_id = str(uuid.uuid4())
-        history.add_exchange(user["id"], conv_id, question, result, answer_id)
+        # Create the conversation only once there's an answer, so failures don't leave empty chats.
+        if not conv_id:
+            conv_id = history.create_conversation(user["id"], question)["id"]
+        try:
+            history.add_exchange(user["id"], conv_id, question, result, answer_id)
+        except Exception:
+            if not req.conversation_id:
+                history.delete_conversation(user["id"], conv_id)
+            raise
     except HTTPException:
         raise
     except Exception as e:  # quota errors, paused Supabase project
