@@ -139,3 +139,37 @@ create table if not exists feedback (
 );
 create index if not exists feedback_rating_idx on feedback (rating, created_at desc);
 alter table feedback enable row level security;
+
+-- ---------------------------------------------------------------------------------------
+-- Accounts + chat history (Supabase Auth). The backend verifies the user's access token and
+-- reads/writes these tables with the service key, scoped to that user. RLS is enabled with no
+-- policies, so the public anon key can't read anyone's history directly.
+-- Uploads from logged-in users live in documents.namespace = 'user:<uuid>' with no expiry.
+
+create table if not exists conversations (
+  id          uuid        primary key default gen_random_uuid(),
+  user_id     uuid        not null references auth.users (id) on delete cascade,
+  title       text        not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists conversations_user_idx on conversations (user_id, updated_at desc);
+
+create table if not exists messages (
+  id               bigserial   primary key,
+  conversation_id  uuid        not null references conversations (id) on delete cascade,
+  user_id          uuid        not null references auth.users (id) on delete cascade,
+  role             text        not null check (role in ('user', 'assistant')),
+  content          text        not null,
+  citations        jsonb       not null default '[]'::jsonb,
+  grounded         boolean,
+  answer_id        uuid,                    -- links an assistant message to its feedback row
+  created_at       timestamptz not null default now()
+);
+create index if not exists messages_conversation_idx on messages (conversation_id, id);
+
+alter table conversations enable row level security;
+alter table messages enable row level security;
+
+-- Feedback now records who rated (so reopened chats show the user's earlier votes).
+alter table feedback add column if not exists user_id uuid references auth.users (id) on delete cascade;

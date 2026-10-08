@@ -80,6 +80,9 @@ code { font-size: 0.9em; background: var(--brand-soft); color: var(--brand-ink);
 .logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 800; font-size: 26px; letter-spacing: -0.03em; }
 .logo-sm { font-size: 18px; }
 .nav-links { display: flex; gap: 30px; }
+.nav-cta { display: flex; align-items: center; gap: 18px; }
+.nav-login { text-decoration: none; font-weight: 600; font-size: 15px; color: var(--ink); }
+.nav-login:hover { color: var(--brand); }
 .nav-links a {
   position: relative; text-decoration: none; color: var(--text); font-size: 15px; font-weight: 500; padding: 24px 0;
 }

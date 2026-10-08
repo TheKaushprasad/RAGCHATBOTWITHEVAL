@@ -11,57 +11,109 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
-<body>
-  <main class="app">
-    <header class="top">
-      <div>
+<body class="is-loading">
+  <div class="shell">
+    <!-- Left: history -->
+    <aside id="sidebar" class="sidebar" aria-label="Chat history">
+      <div class="side-top">
         <a class="brand" href="/" aria-label="Queryva home">
           <img src="/favicon.svg" alt="" width="28" height="28" />
           <span>Queryva</span>
         </a>
-        <p class="sub">Answers come only from the indexed documents, with citations.</p>
+        <button id="side-close" class="icon-btn only-mobile" type="button" aria-label="Close history">✕</button>
       </div>
-      <button id="docs-toggle" class="docs-toggle" type="button" aria-expanded="false" aria-controls="docs">
-        Documents <span id="docs-count" class="count"></span>
+      <button id="new-chat" class="new-chat" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> New chat
       </button>
-    </header>
-
-    <section id="docs" class="docs" hidden>
-      <div id="drop" class="drop">
-        <input id="file" type="file" accept=".docx,.pdf,.md,.markdown,.mdx,.txt" multiple hidden />
-        <button id="pick" type="button" class="pick">Upload a document</button>
-        <span class="hint">or drop it here · DOCX, PDF, MD, TXT · <span id="limits">max 4 MB</span></span>
+      <label class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+        <input id="history-search" type="search" placeholder="Search chats" aria-label="Search chats" autocomplete="off" />
+      </label>
+      <h2 class="side-label">Recent chats</h2>
+      <nav id="history" class="history"><p class="muted side-empty">No conversations yet.</p></nav>
+      <div class="side-foot">
+        <span id="avatar" class="avatar" aria-hidden="true"></span>
+        <span id="user-email" class="user-email" title=""></span>
+        <a class="icon-link" href="/settings/" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </a>
+        <button id="logout" class="link-btn" type="button">Log out</button>
       </div>
-      <p class="privacy">Uploads are private to this browser and deleted after <span id="ttl">24</span> hours.</p>
-      <div id="upload-status" class="status" role="status" aria-live="polite"></div>
+    </aside>
+    <div id="scrim" class="scrim" hidden></div>
 
-      <h2>Your documents</h2>
-      <ul id="uploads" class="doclist"><li class="muted">None yet.</li></ul>
+    <!-- Middle: chat -->
+    <main class="app">
+      <header class="top">
+        <button id="side-open" class="icon-btn only-mobile" type="button" aria-label="Open history" aria-controls="sidebar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="top-title">
+          <h1 id="conv-title">New chat</h1>
+          <p id="scope" class="sub">Answers come only from your documents, with sources.</p>
+        </div>
+        <button id="docs-toggle" class="docs-toggle" type="button" aria-expanded="false" aria-controls="docs">
+          Documents <span id="docs-count" class="count"></span>
+        </button>
+      </header>
 
-      <details>
-        <summary>Sample documents (<span id="sample-count">0</span>)</summary>
-        <ul id="samples" class="doclist"></ul>
-      </details>
-    </section>
+      <section id="docs" class="docs" hidden>
+        <div id="drop" class="drop">
+          <input id="file" type="file" accept=".docx,.pdf,.md,.markdown,.mdx,.txt" multiple hidden />
+          <button id="pick" type="button" class="pick">Upload a document</button>
+          <span class="hint">or drop it here · DOCX, PDF, MD, TXT · <span id="limits">max 4 MB</span></span>
+        </div>
+        <p class="privacy">Uploads are private to your account and kept until you remove them.</p>
+        <div id="upload-status" class="status" role="status" aria-live="polite"></div>
 
-    <section id="log" class="log" aria-live="polite">
-      <div class="empty" id="empty">Ask a question about the documents, or upload your own.</div>
-    </section>
+        <h2>Your documents</h2>
+        <ul id="uploads" class="doclist"><li class="muted">None yet.</li></ul>
 
-    <form id="form" class="composer">
-      <textarea id="input" rows="1" maxlength="2000" placeholder="Ask a question…" autofocus></textarea>
-      <button id="send" type="submit">Send</button>
-    </form>
-  </main>
+        <details>
+          <summary>Shared documents (<span id="sample-count">0</span>)</summary>
+          <ul id="samples" class="doclist"></ul>
+        </details>
+      </section>
+
+      <section id="log" class="log" aria-live="polite"></section>
+
+      <form id="form" class="composer">
+        <div class="composer-box">
+          <button id="attach" class="attach" type="button" aria-label="Upload a document" title="Upload a document">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg>
+          </button>
+          <textarea id="input" rows="1" maxlength="2000" placeholder="Ask anything about your documents…" autofocus></textarea>
+          <button id="send" type="submit" aria-label="Send">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg>
+          </button>
+        </div>
+        <p class="composer-hint">Answers use the shared AI PM notes and your uploads · PDF, DOCX, MD, TXT</p>
+      </form>
+    </main>
+
+    <!-- Right: sources for the selected answer -->
+    <aside id="sources" class="sources" aria-label="Sources" hidden>
+      <div class="src-head">
+        <div>
+          <h2>Sources</h2>
+          <p id="src-summary" class="src-summary"></p>
+        </div>
+        <button id="src-close" class="icon-btn" type="button" aria-label="Close sources">✕</button>
+      </div>
+      <ol id="src-list" class="src-list"></ol>
+    </aside>
+  </div>
 
   <template id="msg-tpl">
     <article class="msg">
       <div class="body"></div>
       <div class="cites"></div>
-      <div class="cite-detail" hidden></div>
     </article>
   </template>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/markdown.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

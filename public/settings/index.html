@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings · Queryva</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/auth.css" />
+</head>
+<body class="is-loading" data-page="settings">
+  <main class="auth settings">
+    <div class="settings-top">
+      <a class="auth-logo" href="/"><img src="/favicon.svg" alt="" width="30" height="30" /><span>Queryva</span></a>
+      <a href="/chat/">← Back to chat</a>
+    </div>
+
+    <section class="auth-card">
+      <h1>Settings</h1>
+      <p class="auth-sub">Signed in as <strong id="email"></strong></p>
+
+      <h2>Change password</h2>
+      <p id="pw-msg" class="auth-msg" role="alert" hidden></p>
+      <form id="pw-form" novalidate>
+        <label>Current password
+          <input name="current" type="password" autocomplete="current-password" required />
+        </label>
+        <label>New password
+          <input name="password" type="password" autocomplete="new-password" minlength="8" required />
+          <small>At least 8 characters.</small>
+        </label>
+        <label>Confirm new password
+          <input name="confirm" type="password" autocomplete="new-password" minlength="8" required />
+        </label>
+        <button type="submit" class="auth-btn">Update password</button>
+      </form>
+    </section>
+
+    <section class="auth-card">
+      <h2>Your data</h2>
+      <p class="auth-sub">Uploaded documents can be managed from the Documents panel in the chat.</p>
+      <p id="hist-msg" class="auth-msg" role="alert" hidden></p>
+      <button id="clear-history" type="button" class="secondary-btn">Delete all chat history</button>
+    </section>
+
+    <section class="auth-card danger">
+      <h2>Delete account</h2>
+      <p class="auth-sub">Permanently deletes your account, chat history, feedback and uploaded documents. This can't be undone.</p>
+      <p id="del-msg" class="auth-msg" role="alert" hidden></p>
+      <form id="del-form" novalidate>
+        <label>Type <strong>DELETE</strong> to confirm
+          <input name="confirm" type="text" autocomplete="off" required />
+        </label>
+        <button type="submit" class="danger-btn">Delete my account</button>
+      </form>
+    </section>
+
+    <p class="auth-foot"><button id="logout" type="button" class="link-btn">Log out</button></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/settings.js"></script>
+</body>
+</html>

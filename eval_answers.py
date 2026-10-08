@@ -6,6 +6,8 @@ against the reference ("golden") answer.
     python eval_answers.py --file examples/tidepool/evals.json   # archived Tidepool case study
     TOP_K=5 python eval_answers.py --out results/golden-k5       # experiment without overwriting the baseline
     python eval_answers.py --report-only                         # rebuild the report from saved answers
+    python eval_answers.py --file evals_followup.json            # follow-up questions (rewritten using history)
+    python eval_answers.py --file evals_followup.json --no-rewrite --out results/followup-norewrite  # baseline
 
 Each question is graded by an LLM judge that sees the question, the golden answer, the bot's answer
 and the passages the bot retrieved. It returns three grades:
@@ -39,7 +41,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from rag import config, llm
+from rag import config, followup, llm
 from rag.embeddings import embed_documents
 from rag.evalset import DEFAULT_EVALS, is_hit, load_cases, md_table, results_dir, utf8_stdout
 from rag.pipeline import answer_question, is_refusal
@@ -138,6 +140,8 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--delay", type=float, default=0.0, help="seconds between questions (rate limits)")
     ap.add_argument("--out", default=None, help="results folder (default: results/<eval set>/)")
+    ap.add_argument("--no-rewrite", action="store_true",
+                    help="for follow-up cases (with \"history\"), skip rewriting into a standalone question (baseline)")
     ap.add_argument("--report-only", action="store_true",
                     help="rebuild answer_eval.md from the saved answers.jsonl without re-running questions")
     args = ap.parse_args()
@@ -158,7 +162,10 @@ def main() -> int:
     print("-" * 96)
     for i, case in enumerate(cases, start=1):
         t0 = time.perf_counter()
-        res = answer_question(case["question"])
+        # Follow-up cases carry earlier turns; rewrite them into a standalone question like the API does.
+        turns = [tuple(t) for t in case.get("history", [])]
+        asked = case["question"] if args.no_rewrite or not turns else followup.rewrite(case["question"], turns)
+        res = answer_question(asked)
         latency = time.perf_counter() - t0
         refused = is_refusal(res["answer"])
         rec = {
@@ -171,7 +178,11 @@ def main() -> int:
         if case.get("expected_substring"):
             rec["citation_ok"] = any(is_hit({"source": c["source"], "content": c["snippet"]}, case)
                                      for c in res["citations"])
-        rec.update(judge(case, res["answer"], res["retrieved"]))
+        if turns:
+            rec["searched_for"] = asked
+        # The judge sees the intended standalone question, so "it"/"that" doesn't confuse the grading.
+        rec.update(judge({**case, "question": case.get("golden_standalone", case["question"])},
+                         res["answer"], res["retrieved"]))
         if case["answerable"] and refused:
             rec["correct"] = "no"  # a refusal never counts as a correct answer, however lenient the judge
         rec["diagnosis"] = diagnose(rec)

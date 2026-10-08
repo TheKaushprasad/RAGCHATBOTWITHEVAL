@@ -115,6 +115,35 @@ python feedback_report.py --export golden_candidates.json
 
 The first command prints the helpful rate, splits it by config, and lists every thumbs-down with the user's comment and the cited pages. The second turns those thumbs-downs into draft golden-dataset entries. Each draft includes the bot's answer and the user's comment; you write the correct `answer`, then add it to `evals_golden.json`. Real user failures become permanent eval cases, so the next `eval_answers.py` run checks they stay fixed.
 
+## Follow-up questions
+
+Retrieval searches with a single query, so a follow-up like *"how is ChatGPT different from it?"* would search for the wrong thing. Before retrieval, `rag/followup.py` rewrites follow-ups into a standalone question using the last 3 turns, e.g. *"How is ChatGPT different from a base model?"*. The chat shows the rewritten query under the answer ("Searched for: …"). First messages skip the rewrite, as do messages that already make sense on their own.
+
+**Measured on [`evals_followup.json`](evals_followup.json).** These are 14 follow-ups built from pairs of related golden questions: the first question and its golden answer are the conversation so far, and the second is phrased as a context-dependent follow-up, graded against its golden answer.
+
+| | No rewrite | With rewrite |
+|---|---|---|
+| Correctness vs golden | 61% | **89%** |
+| Fully correct answers | 50% | **79%** |
+| Context recall | 86% | **96%** |
+| False refusals | 7% | **0%** |
+| Faithfulness | 100% | 100% |
+
+The first version of the rewrite turned *"and what does the server expose?"* into *"What does the server expose?"*, which lost the topic (MCP). Adding a rule to name an implied topic fixed it. Reports are in `results/followup/` and `results/followup-norewrite/`.
+
+## Chat experience
+
+- **Formatted answers.** Headings, lists, bold and code render properly (`public/markdown.js`), built from DOM nodes rather than HTML, so model output can't inject markup.
+- **Source panel.** Clicking a citation `[1]` or a source chip opens a side panel listing every passage the answer used: file, page or section, the full passage, and whether it came from the shared notes or your upload.
+- **Clear states.**
+  - An empty chat shows four starter questions.
+  - Answers that aren't in the documents appear as a "Not found in your documents" card, with **Rephrase** and **Upload a document** actions.
+  - Uploads show live status: uploading with progress, then indexing, then ready or failed.
+- **Suggested follow-ups.** After each answer, three "Try asking" questions are generated from the passages just used, so they're answerable.
+- **History.** Searchable, with relative timestamps; reopened chats keep their citations and votes.
+- **Header and input box.** The header shows how many documents are being searched. The input box has an attach button.
+- **Accounts.** Sign up, log in and reset a forgotten password by email (Supabase Auth). The **Settings** page has change password (asks for the current one first), delete all chat history, and delete account, which removes uploads, chats and feedback.
+
 ## Case study: tuning on a synthetic corpus
 
 Before the AI PM notes, I tuned the pipeline on a fictional product's docs ("Tidepool", 8 files) with a 50-question eval set. Because it's fictional, the model can't answer from general knowledge. That work is kept in [`examples/tidepool/`](examples/tidepool/) and set the chunking and the refusal threshold used today.
@@ -191,15 +220,24 @@ vercel --prod
 The tuned settings are the code defaults, so only the three keys are required. Vercel detects the FastAPI app in `api/index.py` and serves `public/` statically. Don't add an `/api` rewrite: Vercel now routes rewritten requests by their destination path, so FastAPI would see `/api/index` and return 404. Ingestion and evals run locally and are excluded from the deploy.
 
 ### Uploading your own documents
-Visitors can upload `.docx`, `.pdf`, `.md` or `.txt` files from the **Documents** panel (button or drag-and-drop).
-- **Private per browser.** The page creates a random session ID (kept in `localStorage`) and sends it as `X-Session-Id`. Uploads are stored under `session:<id>`, and the search functions only return `public` chunks plus the caller's own namespace. Other visitors can't see or delete them, and nobody can delete the indexed docs through the API.
-- **Temporary.** Uploads expire after 24 hours. Expired rows are filtered out of search and purged on the next upload.
-- **Cost-bounded for a public demo.** 4 MB per file, 5 files per visitor, 150 chunks per file, and 5,000 uploaded chunks across all visitors (configurable through `UPLOAD_*` env vars).
+Logged-in users can upload `.docx`, `.pdf`, `.md` or `.txt` files with the attach button or from the **Documents** panel (button or drag-and-drop).
+- **Private to the account.** Uploads are stored under the namespace `user:<user id>`, and the search functions only return shared (`public`) chunks plus the caller's own namespace. Other users can't see or delete them, and nobody can delete the shared docs through the API.
+- **Kept until removed.** Account uploads don't expire; they're deleted from the Documents panel or with the account.
+- **Cost-bounded.** 4 MB per file, 5 files per user, 150 chunks per file, and 5,000 uploaded chunks across all users (configurable through `UPLOAD_*` env vars).
 - **Same pipeline.** Uploads go through the same loaders, chunker and embedder as `ingest.py`. Word headings, lists and tables are kept. PDFs exported from Google Docs, which place every word separately, are detected and re-extracted in layout mode.
+
+### Accounts
+Authentication uses Supabase Auth (email + password, email confirmation, password reset). The browser gets only the public anon key, served by `/api/public-config`. Every API call sends the user's access token, which the backend verifies with Supabase. History, feedback and uploads are always queried with that user's ID. The `conversations` and `messages` tables have row-level security on with no public policies, so they're only reachable through the backend.
+
+Supabase setup, beyond `schema.sql`:
+- Under **Authentication → URL Configuration**, set the Site URL to your deployed URL, and add `https://<your-domain>/**` and `http://localhost:8000/**` to the redirect URLs.
+- Add `SUPABASE_ANON_KEY` to `.env` and to Vercel.
+
+The built-in email sender is limited to a few emails per hour. Configure custom SMTP (e.g. Resend) for real traffic.
 
 ## Project layout
 ```
-api/index.py         FastAPI app (chat, upload, documents, feedback, health)
+api/index.py         FastAPI app (chat, history, suggestions, upload, documents, feedback, account)
 rag/config.py        env-driven settings (provider, models, chunking, retrieval, upload limits)
 rag/embeddings.py    OpenAI / Gemini embeddings, batching, retry on 429/5xx
 rag/llm.py           prompt, chat completion, citation parsing
@@ -209,17 +247,21 @@ rag/pipeline.py      retrieve → guard → answer (shared by API and evals)
 rag/store.py         Supabase: upsert, namespaces, vector + hybrid search RPCs
 rag/uploads.py       visitor upload validation, limits, indexing
 rag/evalset.py       eval loading, hit logic, threshold search, results folders
+rag/auth.py          verifies Supabase access tokens
+rag/history.py       per-user conversations and messages
+rag/followup.py      follow-up rewriting and suggested questions
 ingest.py            incremental ingestion of docs/ (re-embeds only changed chunks)
 eval_answers.py      golden-dataset answer eval with LLM judge + failure diagnosis
 eval.py              retrieval eval (hit rate / MRR; needs expected_substring labels)
 feedback_report.py   thumbs up/down summary; export thumbs-downs as golden-dataset drafts
 tune.py              hyperparameter sweep (needs expected_substring labels)
 evals_golden.json    100-question golden dataset for the AI PM notes
+evals_followup.json  14 follow-up questions built from golden pairs
 docs/                the indexed corpus (ai-pm-notes.pdf)
 examples/tidepool/   synthetic-corpus case study: docs, 50-question eval set, tuning results
 results/             golden-dataset eval reports
 supabase/schema.sql  documents + feedback tables, indexes, namespaces, match_documents + hybrid_search
-public/              landing page (index.html) + chat UI (chat/) + documents panel
+public/              landing page, chat (chat/), login/signup/forgot/reset pages, settings, markdown renderer
 ```
 
 ## Notes and limitations
@@ -229,4 +271,5 @@ public/              landing page (index.html) + chat UI (chat/) + documents pan
 - **Switching embedding model re-embeds everything.** Changing `PROVIDER` or `EMBED_MODEL` changes the embedding space; chunk hashes include the model, so `python ingest.py` re-embeds automatically.
 - **Supabase free projects pause** after about a week of inactivity.
 - **No OCR.** Scanned PDFs without a text layer aren't supported.
-- **The session ID is a capability, not authentication.** Anyone holding a browser's ID could read that browser's uploads. That's fine for temporary demo files; real user data would need accounts.
+- **Follow-ups use the last 3 turns only.** References to something said much earlier in a long chat may not resolve.
+- **The rewrite adds one LLM call** (~1s) to follow-up messages; first messages don't pay it.

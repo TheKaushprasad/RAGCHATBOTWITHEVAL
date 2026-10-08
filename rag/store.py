@@ -15,7 +15,13 @@ def client() -> Client:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    # 'Z' form (no '+00:00') so the value is safe inside PostgREST or=(...) filters.
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def _live() -> str:
+    """Filter for rows that haven't expired: permanent (null) or expiring in the future."""
+    return f"expires_at.is.null,expires_at.gt.{_now()}"
 
 
 # --- ingestion (public namespace) -------------------------------------------------------
@@ -51,7 +57,7 @@ def reset() -> None:
     client().table(TABLE).delete().eq("namespace", PUBLIC).execute()
 
 
-# --- uploads (per-session namespaces) ---------------------------------------------------
+# --- uploads (per-user namespaces) ---------------------------------------------------
 
 def delete_source(source: str, namespace: str) -> None:
     client().table(TABLE).delete().eq("namespace", namespace).eq("source", source).execute()
@@ -65,7 +71,7 @@ def list_sources(namespace: str) -> list[dict]:
     """[{source, chunks, expires_at}] for one namespace, skipping expired rows."""
     q = client().table(TABLE).select("source,expires_at").eq("namespace", namespace)
     if namespace != PUBLIC:
-        q = q.gt("expires_at", _now())
+        q = q.or_(_live())
     out: dict[str, dict] = {}
     for r in q.execute().data:
         d = out.setdefault(r["source"], {"source": r["source"], "chunks": 0, "expires_at": r["expires_at"]})
@@ -74,9 +80,9 @@ def list_sources(namespace: str) -> list[dict]:
 
 
 def upload_chunk_count() -> int:
-    """Live uploaded chunks across all visitors (for the global abuse cap)."""
+    """Live uploaded chunks across all users (for the global abuse cap)."""
     res = (client().table(TABLE).select("id", count="exact", head=True)
-           .neq("namespace", PUBLIC).gt("expires_at", _now()).execute())
+           .neq("namespace", PUBLIC).or_(_live()).execute())
     return res.count or 0
 
 
@@ -84,7 +90,7 @@ def upload_chunk_count() -> int:
 
 def match(query_embedding: list[float], k: int, query_text: str | None = None, mode: str = "vector",
           session_ns: str | None = None) -> list[dict]:
-    """Top-k chunks from the public docs plus (if given) one visitor's uploads."""
+    """Top-k chunks from the public docs plus (if given) one user's uploads."""
     if mode == "hybrid":
         if not query_text:
             raise ValueError("hybrid search needs query_text")
@@ -105,12 +111,15 @@ FEEDBACK = "feedback"
 
 
 def save_feedback(row: dict) -> None:
-    """Insert or update the rating for one answer (keyed by answer_id)."""
+    """Insert or update the rating for one answer (keyed by answer_id), only if it's the user's own."""
+    existing = client().table(FEEDBACK).select("user_id").eq("answer_id", row["answer_id"]).limit(1).execute().data
+    if existing and existing[0]["user_id"] not in (None, row["user_id"]):
+        raise PermissionError("This answer belongs to another user.")
     client().table(FEEDBACK).upsert({**row, "updated_at": _now()}, on_conflict="answer_id").execute()
 
 
-def delete_feedback(answer_id: str) -> None:
-    client().table(FEEDBACK).delete().eq("answer_id", answer_id).execute()
+def delete_feedback(answer_id: str, user_id: str) -> None:
+    client().table(FEEDBACK).delete().eq("answer_id", answer_id).eq("user_id", user_id).execute()
 
 
 def list_feedback(rating: int | None = None, limit: int = 1000) -> list[dict]:

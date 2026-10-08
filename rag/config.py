@@ -29,6 +29,8 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+# Public (anon / publishable) key, sent to the browser for Supabase Auth only. Safe to expose: RLS blocks data access.
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
 CHAT_MODEL = os.environ.get("CHAT_MODEL", _DEFAULTS[PROVIDER]["chat"])
 EMBED_MODEL = os.environ.get("EMBED_MODEL", _DEFAULTS[PROVIDER]["embed"])
@@ -44,9 +46,8 @@ CHUNK_OVERLAP = int(os.environ.get("CHUNK_OVERLAP", "50"))
 
 IDK = "I don't know"
 
-# Visitor uploads (private per browser session, auto-expiring).
+# User uploads (private to the account, kept until deleted).
 UPLOAD_MAX_BYTES = int(os.environ.get("UPLOAD_MAX_BYTES", str(4 * 1024 * 1024)))  # Vercel caps request bodies at 4.5 MB
-UPLOAD_MAX_FILES = int(os.environ.get("UPLOAD_MAX_FILES", "5"))  # per session
+UPLOAD_MAX_FILES = int(os.environ.get("UPLOAD_MAX_FILES", "5"))  # per user
 UPLOAD_MAX_CHUNKS = int(os.environ.get("UPLOAD_MAX_CHUNKS", "150"))  # per file (~50k tokens) - bounds embedding cost
-UPLOAD_GLOBAL_MAX_CHUNKS = int(os.environ.get("UPLOAD_GLOBAL_MAX_CHUNKS", "5000"))  # all visitors combined
-UPLOAD_TTL_HOURS = int(os.environ.get("UPLOAD_TTL_HOURS", "24"))
+UPLOAD_GLOBAL_MAX_CHUNKS = int(os.environ.get("UPLOAD_GLOBAL_MAX_CHUNKS", "5000"))  # all users combined

@@ -1,9 +1,7 @@
-"""Visitor uploads: parse → chunk → embed → store in the visitor's private namespace."""
+"""User uploads: parse → chunk → embed → store in the user's private namespace (kept until deleted)."""
 
 import hashlib
 import re
-import uuid
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from rag import config, store
@@ -16,14 +14,8 @@ class UploadError(ValueError):
     """A problem with the upload the visitor can fix (shown to them as-is)."""
 
 
-def session_namespace(session_id: str | None) -> str | None:
-    """Map the browser's session id to a namespace. Only well-formed UUIDs are accepted."""
-    if not session_id:
-        return None
-    try:
-        return f"session:{uuid.UUID(session_id)}"
-    except ValueError:
-        raise UploadError("Invalid session id.") from None
+def user_namespace(user_id: str) -> str:
+    return f"user:{user_id}"
 
 
 def clean_filename(name: str) -> str:
@@ -62,7 +54,6 @@ def ingest_upload(filename: str, data: bytes, namespace: str) -> dict:
 
     texts = [embed_text(source, c) for c in chunks]
     vectors = embed_documents(texts)
-    expires = datetime.now(timezone.utc) + timedelta(hours=config.UPLOAD_TTL_HOURS)
 
     store.delete_source(source, namespace)  # re-uploading a file replaces it
     store.upsert_chunks([
@@ -75,8 +66,8 @@ def ingest_upload(filename: str, data: bytes, namespace: str) -> dict:
             "content_hash": hashlib.sha256(f"{model_id()}\n{t}".encode()).hexdigest(),
             "metadata": c.meta,
             "embedding": v,
-            "expires_at": expires.isoformat(),
+            "expires_at": None,  # account uploads are kept until the user deletes them
         }
         for i, (c, t, v) in enumerate(zip(chunks, texts, vectors))
     ])
-    return {"source": source, "chunks": len(chunks), "expires_at": expires.isoformat()}
+    return {"source": source, "chunks": len(chunks)}
