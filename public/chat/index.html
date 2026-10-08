@@ -31,6 +31,22 @@
       </label>
       <h2 class="side-label">Recent chats</h2>
       <nav id="history" class="history"><p class="muted side-empty">No conversations yet.</p></nav>
+
+      <section id="docs" class="side-docs" aria-labelledby="docs-label">
+        <div class="side-docs-head">
+          <h2 id="docs-label" class="side-label">My documents <span id="docs-count" class="count"></span></h2>
+          <button id="pick" type="button" class="add-doc" aria-label="Upload a document">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Upload
+          </button>
+        </div>
+        <input id="file" type="file" accept=".docx,.pdf,.md,.markdown,.mdx,.txt" multiple hidden />
+        <div id="drop" class="drop">
+          <ul id="uploads" class="doclist"></ul>
+          <p class="drop-hint">Drop files here · PDF, DOCX, MD, TXT · <span id="limits">max 4 MB</span></p>
+        </div>
+        <div id="upload-status" class="status" role="status" aria-live="polite"></div>
+      </section>
+
       <div class="side-foot">
         <span id="avatar" class="avatar" aria-hidden="true"></span>
         <span id="user-email" class="user-email" title=""></span>
@@ -52,28 +68,7 @@
           <h1 id="conv-title">New chat</h1>
           <p id="scope" class="sub">Answers come only from your documents, with sources.</p>
         </div>
-        <button id="docs-toggle" class="docs-toggle" type="button" aria-expanded="false" aria-controls="docs">
-          Documents <span id="docs-count" class="count"></span>
-        </button>
       </header>
-
-      <section id="docs" class="docs" hidden>
-        <div id="drop" class="drop">
-          <input id="file" type="file" accept=".docx,.pdf,.md,.markdown,.mdx,.txt" multiple hidden />
-          <button id="pick" type="button" class="pick">Upload a document</button>
-          <span class="hint">or drop it here · DOCX, PDF, MD, TXT · <span id="limits">max 4 MB</span></span>
-        </div>
-        <p class="privacy">Uploads are private to your account and kept until you remove them.</p>
-        <div id="upload-status" class="status" role="status" aria-live="polite"></div>
-
-        <h2>Your documents</h2>
-        <ul id="uploads" class="doclist"><li class="muted">None yet.</li></ul>
-
-        <details>
-          <summary>Shared documents (<span id="sample-count">0</span>)</summary>
-          <ul id="samples" class="doclist"></ul>
-        </details>
-      </section>
 
       <section id="log" class="log" aria-live="polite"></section>
 
@@ -87,7 +82,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg>
           </button>
         </div>
-        <p class="composer-hint">Answers use the shared AI PM notes and your uploads · PDF, DOCX, MD, TXT</p>
+        <p class="composer-hint">Answers come only from your uploaded documents, with sources</p>
       </form>
     </main>
 

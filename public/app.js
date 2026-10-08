@@ -6,15 +6,9 @@ const tpl = document.getElementById("msg-tpl");
 const historyNav = document.getElementById("history");
 const convTitle = document.getElementById("conv-title");
 
-const STARTERS = [
-  "What does the swiss cheese capability model mean?",
-  "What are the main agentic design patterns?",
-  "What are embeddings and embedding models?",
-  "regression vs classification?",
-];
-
 let conversationId = null; // null = a new chat that hasn't been saved yet
-let docCounts = { shared: 0, mine: 0 };
+let myDocs = []; // the user's uploaded files: [{source, chunks}]
+let docsLoaded = false;
 
 // --- auth + API -------------------------------------------------------------------------
 
@@ -111,6 +105,16 @@ function plural(n, word) {
 
 // --- empty state ------------------------------------------------------------------------
 
+function starterQuestions() {
+  // Built from the user's own files, so every starter is answerable.
+  const names = myDocs.map((d) => d.source);
+  const qs = [];
+  if (names[0]) qs.push(`Summarize ${names[0]}`, `What are the key points in ${names[0]}?`);
+  if (names[1]) qs.push(`Summarize ${names[1]}`);
+  qs.push(names.length > 1 ? "What do my documents have in common?" : "What topics does this document cover?");
+  return qs.slice(0, 4);
+}
+
 function showEmpty() {
   log.replaceChildren();
   const box = el("div", "empty");
@@ -118,22 +122,30 @@ function showEmpty() {
   const logo = el("img", "empty-logo");
   logo.src = "/favicon.svg";
   logo.alt = "";
-  box.append(
-    logo,
-    el("h2", "", "Ask your documents anything"),
-    el("p", "", "Answers come from the shared AI PM notes and anything you upload, and every claim links to its source."),
-  );
-  const grid = el("div", "starters");
-  for (const q of STARTERS) {
-    const b = el("button", "starter", q);
-    b.type = "button";
-    b.addEventListener("click", () => ask(q));
-    grid.append(b);
+  box.append(logo);
+  if (docsLoaded && !myDocs.length) {
+    box.append(
+      el("h2", "", "Upload your first document"),
+      el("p", "", "Queryva answers only from the files you add: PDF, Word, Markdown or text. Every answer cites the exact passage it came from."),
+    );
+    const up = el("button", "empty-upload", "Upload a document");
+    up.type = "button";
+    up.addEventListener("click", openUploadPicker);
+    box.append(up, el("p", "empty-note", "Your files are private to your account."));
+  } else {
+    box.append(
+      el("h2", "", "Ask your documents anything"),
+      el("p", "", "Answers come only from your uploaded files, and every claim links to its source."),
+    );
+    const grid = el("div", "starters");
+    for (const q of starterQuestions()) {
+      const b = el("button", "starter", q);
+      b.type = "button";
+      b.addEventListener("click", () => ask(q));
+      grid.append(b);
+    }
+    box.append(grid);
   }
-  const upload = el("button", "link-btn", "Or upload your own document");
-  upload.type = "button";
-  upload.addEventListener("click", openUploadPicker);
-  box.append(grid, upload);
   log.append(box);
 }
 
@@ -199,7 +211,10 @@ function renderNotFound(node, question, data) {
   head.append(icon('<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2M8.5 11h5"/>'), el("strong", "", "Not found in your documents"));
   // Keep the model's explanation if it gave one beyond "I don't know."
   const detail = data.answer.replace(/^\s*I don['’]t know\.?\s*/i, "").trim();
-  const text = el("p", "", detail || "I couldn't find anything about this in the shared notes or your uploads, so I won't guess.");
+  const fallback = myDocs.length
+    ? "I couldn't find anything about this in your documents, so I won't guess."
+    : "You haven't uploaded any documents yet. Upload one and ask again.";
+  const text = el("p", "", detail || fallback);
   const actions = el("div", "nf-actions");
   const rephrase = el("button", "nf-btn", "Rephrase question");
   rephrase.type = "button";
@@ -244,7 +259,7 @@ function openSources(data, selectedN) {
     headBtn.append(el("span", "src-n", String(c.n)), fileBadge(c.source), name);
     const passage = el("blockquote", "src-passage", c.snippet);
     passage.hidden = c.n !== selectedN;
-    const meta = el("p", "src-meta", `${c.uploaded ? "Your upload" : "Shared notes"} · relevance ${Math.round(c.similarity * 100)}%`);
+    const meta = el("p", "src-meta", `Relevance ${Math.round(c.similarity * 100)}%`);
     meta.hidden = passage.hidden;
     headBtn.addEventListener("click", () => {
       const open = passage.hidden;
@@ -572,12 +587,9 @@ document.getElementById("logout").addEventListener("click", async () => {
   location.replace("/");
 });
 
-// --- documents panel --------------------------------------------------------------------
+// --- documents (sidebar) ----------------------------------------------------------------
 
-const docsPanel = document.getElementById("docs");
-const docsToggle = document.getElementById("docs-toggle");
 const uploadsList = document.getElementById("uploads");
-const samplesList = document.getElementById("samples");
 const statusEl = document.getElementById("upload-status");
 const fileInput = document.getElementById("file");
 const drop = document.getElementById("drop");
@@ -590,37 +602,42 @@ function setStatus(text, kind = "") {
   statusEl.className = `status ${kind}`;
 }
 
-function setDocsPanel(open) {
-  docsPanel.hidden = !open;
-  docsToggle.setAttribute("aria-expanded", String(open));
-}
-
 function openUploadPicker() {
-  setDocsPanel(true);
+  if (matchMedia("(max-width: 820px)").matches) setSidebar(true); // show progress in the drawer on phones
   fileInput.click();
 }
 
 function updateScope() {
-  const total = docCounts.shared + docCounts.mine;
-  document.getElementById("scope").textContent = total
-    ? `Searching ${plural(total, "document")}${docCounts.mine ? ` · ${docCounts.mine} uploaded by you` : ""}`
-    : "Answers come only from your documents, with sources.";
+  document.getElementById("scope").textContent = myDocs.length
+    ? `Searching ${plural(myDocs.length, "document")}`
+    : "No documents yet. Upload one to start.";
 }
 
-function docItem(d, onRemove) {
+const X_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+function docItem(d) {
   const li = el("li");
   li.append(fileBadge(d.source));
   const name = el("span", "name", d.source);
-  name.title = d.source;
-  li.append(name);
-  if (onRemove) {
-    li.append(el("span", "doc-state ready", "Ready"), el("span", "meta", plural(d.chunks, "chunk")));
-    const rm = el("button", "remove", "Remove");
-    rm.type = "button";
-    rm.setAttribute("aria-label", `Remove ${d.source}`);
-    rm.addEventListener("click", () => onRemove(rm));
-    li.append(rm);
-  }
+  name.title = `${d.source} · ${plural(d.chunks, "chunk")}`;
+  const rm = el("button", "doc-rm");
+  rm.type = "button";
+  rm.setAttribute("aria-label", `Remove ${d.source}`);
+  rm.title = "Remove";
+  rm.innerHTML = X_ICON; // static icon markup only
+  rm.addEventListener("click", async () => {
+    if (!confirm(`Remove ${d.source}? Answers will no longer use it.`)) return;
+    rm.disabled = true;
+    try {
+      await api(`/api/documents/${encodeURIComponent(d.source)}`, { method: "DELETE" });
+      await loadDocs();
+      setStatus(`Removed ${d.source}.`);
+    } catch (err) {
+      setStatus(err.message, "error");
+      rm.disabled = false;
+    }
+  });
+  li.append(name, rm);
   return li;
 }
 
@@ -628,7 +645,7 @@ function pendingItem(name, p) {
   const li = el("li", `pending ${p.state}`);
   li.append(fileBadge(name));
   const info = el("span", "name");
-  info.append(name);
+  info.append(el("span", "pending-name", name));
   if (p.state === "uploading") {
     const bar = el("span", "progress");
     const fill = el("span");
@@ -638,11 +655,13 @@ function pendingItem(name, p) {
   }
   if (p.error) info.append(el("small", "doc-error", p.error));
   li.append(info);
-  const label = { uploading: `Uploading ${Math.round(p.progress * 100)}%`, indexing: "Indexing…", failed: "Failed" }[p.state];
+  const label = { uploading: `${Math.round(p.progress * 100)}%`, indexing: "Indexing…", failed: "Failed" }[p.state];
   li.append(el("span", `doc-state ${p.state}`, label));
   if (p.state === "failed") {
-    const dismiss = el("button", "remove", "Dismiss");
+    const dismiss = el("button", "doc-rm");
     dismiss.type = "button";
+    dismiss.setAttribute("aria-label", `Dismiss ${name}`);
+    dismiss.innerHTML = X_ICON;
     dismiss.addEventListener("click", () => {
       pending.delete(name);
       renderDocs(lastDocs);
@@ -652,41 +671,30 @@ function pendingItem(name, p) {
   return li;
 }
 
-let lastDocs = { uploads: [], sample: [], limits: { max_mb: 4, max_files: 5 } };
+let lastDocs = { uploads: [], limits: { max_mb: 4, max_files: 5 } };
 
 function renderDocs(data) {
   lastDocs = data;
   const items = [...pending.entries()].map(([name, p]) => pendingItem(name, p));
   for (const d of data.uploads) {
     if (pending.has(d.source) && pending.get(d.source).state !== "failed") continue;
-    items.push(docItem(d, async (btn) => {
-      if (!confirm(`Remove ${d.source}? Answers will no longer use it.`)) return;
-      btn.disabled = true;
-      try {
-        await api(`/api/documents/${encodeURIComponent(d.source)}`, { method: "DELETE" });
-        await loadDocs();
-        setStatus(`Removed ${d.source}.`);
-      } catch (err) {
-        setStatus(err.message, "error");
-        btn.disabled = false;
-      }
-    }));
+    items.push(docItem(d));
   }
-  if (!items.length) {
-    const li = el("li", "muted doc-empty");
-    li.append("No uploads yet. Add a PDF, Word, Markdown or text file and ask about it.");
-    items.push(li);
-  }
+  if (!items.length) items.push(el("li", "muted doc-empty", "No documents yet."));
   uploadsList.replaceChildren(...items);
-  samplesList.replaceChildren(...data.sample.map((d) => docItem(d)));
-  document.getElementById("sample-count").textContent = data.sample.length;
-  document.getElementById("docs-count").textContent = data.uploads.length ? `(${data.uploads.length} yours)` : "";
+  document.getElementById("docs-count").textContent = data.uploads.length ? `(${data.uploads.length})` : "";
 
   const { max_mb, max_files } = data.limits;
   maxBytes = max_mb * 1024 * 1024;
-  document.getElementById("limits").textContent = `max ${max_mb} MB each, ${max_files} files`;
-  docCounts = { shared: data.sample.length, mine: data.uploads.length };
+  document.getElementById("limits").textContent = `max ${max_mb} MB, ${max_files} files`;
+
+  const hadNone = myDocs.length === 0;
+  myDocs = data.uploads;
+  const firstLoad = !docsLoaded;
+  docsLoaded = true;
   updateScope();
+  // Refresh the empty state when documents first appear or all are removed.
+  if (!firstLoad && document.getElementById("empty") && hadNone !== (myDocs.length === 0)) showEmpty();
 }
 
 async function loadDocs() {
@@ -700,7 +708,6 @@ async function loadDocs() {
 async function uploadFiles(files) {
   if (uploading || !files.length) return;
   uploading = true;
-  setDocsPanel(true);
   setStatus("");
   for (const file of files) pending.set(file.name, { state: "uploading", progress: 0 });
   renderDocs(lastDocs);
@@ -718,7 +725,7 @@ async function uploadFiles(files) {
           renderDocs(lastDocs);
         });
         pending.delete(file.name);
-        setStatus(`${r.source} is ready (${plural(r.chunks, "chunk")}). Ask a question about it.`, "ok");
+        setStatus(`${r.source} is ready. Ask a question about it.`, "ok");
       } catch (err) {
         Object.assign(p, { state: "failed", error: err.message });
       }
@@ -726,26 +733,29 @@ async function uploadFiles(files) {
     }
   } finally {
     uploading = false;
+    if (document.getElementById("empty")) showEmpty(); // starters now reflect the new files
   }
 }
 
-docsToggle.addEventListener("click", () => setDocsPanel(docsPanel.hidden));
 document.getElementById("pick").addEventListener("click", () => fileInput.click());
 document.getElementById("attach").addEventListener("click", openUploadPicker);
 fileInput.addEventListener("change", () => {
   uploadFiles([...fileInput.files]);
   fileInput.value = "";
 });
-drop.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  drop.classList.add("over");
-});
-drop.addEventListener("dragleave", () => drop.classList.remove("over"));
-drop.addEventListener("drop", (e) => {
-  e.preventDefault();
-  drop.classList.remove("over");
-  uploadFiles([...e.dataTransfer.files]);
-});
+// Files can be dropped on the sidebar's document list or anywhere on the conversation.
+for (const target of [drop, log]) {
+  target.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    drop.classList.add("over");
+  });
+  target.addEventListener("dragleave", () => drop.classList.remove("over"));
+  target.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("over");
+    uploadFiles([...e.dataTransfer.files]);
+  });
+}
 
 // --- start ------------------------------------------------------------------------------
 
@@ -763,8 +773,8 @@ drop.addEventListener("drop", (e) => {
     if (event === "SIGNED_OUT") location.replace("/");
   });
 
+  await loadDocs();
   showEmpty();
-  loadDocs();
   await loadHistory();
   const fromHash = location.hash.match(/^#c=([0-9a-f-]{36})$/i);
   if (fromHash) await openConversation(fromHash[1]);

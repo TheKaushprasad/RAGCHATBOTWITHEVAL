@@ -117,7 +117,8 @@ def chat(req: ChatRequest, user: dict = Depends(current_user)) -> ChatResponse:
             # Follow-ups like "and how do you fix it?" are rewritten into a standalone question
             # so retrieval searches for the right thing.
             standalone = followup.rewrite(question, history.recent_turns(user["id"], conv_id))
-        result = pipeline.answer_question(standalone, session_ns=user_namespace(user["id"]))
+        # Users search only their own uploads; the shared AI PM notes are for the evals and demo numbers.
+        result = pipeline.answer_question(standalone, session_ns=user_namespace(user["id"]), include_public=False)
         answer_id = str(uuid.uuid4())
         # Create the conversation only once there's an answer, so failures don't leave empty chats.
         if not conv_id:
@@ -224,7 +225,6 @@ def feedback(req: FeedbackRequest, user: dict = Depends(current_user)) -> dict:
 def documents(user: dict = Depends(current_user)) -> dict:
     try:
         return {
-            "sample": store.list_sources(store.PUBLIC),
             "uploads": store.list_sources(user_namespace(user["id"])),
             "limits": {"max_mb": config.UPLOAD_MAX_BYTES // (1024 * 1024), "max_files": config.UPLOAD_MAX_FILES},
         }

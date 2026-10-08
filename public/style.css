@@ -326,3 +326,43 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
   .sidebar { transition: none; }
   .msg.pending .body, .pending.indexing .doc-state { animation: none; }
 }
+
+/* --- documents in the sidebar --- */
+.history { min-height: 96px; }
+.side-docs { display: flex; flex-direction: column; gap: 6px; max-height: 46%; min-height: 0; padding-top: 10px; border-top: 1px solid var(--border); }
+.side-docs-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.side-docs-head .side-label { margin: 0 6px; }
+.side-docs .count { color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; }
+.add-doc {
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--panel); color: var(--accent); font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.add-doc:hover { border-color: var(--accent); background: var(--accent-soft); }
+.add-doc svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.side-docs .drop {
+  display: flex; flex-direction: column; gap: 4px; min-height: 0; padding: 4px; overflow-y: auto;
+  border: 1.5px dashed transparent; border-radius: 10px; background: transparent;
+}
+.side-docs .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.side-docs .doclist li { gap: 8px; padding: 6px 6px; border-bottom: 0; border-radius: 8px; font-size: 13px; }
+.side-docs .doclist li:hover { background: var(--bg); }
+.side-docs .doc-empty { padding: 4px 6px !important; }
+.drop-hint { margin: 2px 6px 0; color: var(--muted); font-size: 11.5px; }
+.doc-rm {
+  display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--muted); cursor: pointer; opacity: 0;
+}
+.doclist li:hover .doc-rm, .doc-rm:focus-visible, .pending .doc-rm { opacity: 1; }
+.doc-rm:hover { color: var(--error); background: color-mix(in srgb, var(--error) 10%, transparent); }
+.doc-rm svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.pending-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-docs .status { margin: 0 6px; font-size: 12px; }
+
+/* empty state for a user with no documents */
+.empty-upload {
+  margin-top: 4px; padding: 12px 22px; border: 0; border-radius: 12px; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 10px 24px -12px rgba(91, 78, 240, 0.7);
+}
+.empty-note { margin-top: 12px !important; font-size: 13px; }
+
+@media (hover: none) { .doc-rm, .conv-del { opacity: 1; } }

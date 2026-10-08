@@ -5,11 +5,11 @@ from rag.embeddings import embed_query
 
 
 def retrieve(question: str, k: int | None = None, mode: str | None = None,
-             session_ns: str | None = None) -> list[dict]:
-    """Search the public docs, plus one visitor's uploads when session_ns is given."""
+             session_ns: str | None = None, include_public: bool = True) -> list[dict]:
+    """Search one user's uploads (session_ns) and, if include_public, the shared docs (used by the evals)."""
     mode = mode or config.RETRIEVAL_MODE
     return store.match(embed_query(question), k or config.TOP_K, query_text=question, mode=mode,
-                       session_ns=session_ns)
+                       session_ns=session_ns, include_public=include_public)
 
 
 def citation(n: int, c: dict) -> dict:
@@ -29,9 +29,9 @@ def is_refusal(text: str) -> bool:
     return text.strip().lower().startswith(config.IDK.lower())
 
 
-def answer_question(question: str, session_ns: str | None = None) -> dict:
+def answer_question(question: str, session_ns: str | None = None, include_public: bool = True) -> dict:
     """Returns {answer, citations, retrieved, grounded}. Raises on upstream (retrieval) failures."""
-    chunks = retrieve(question, session_ns=session_ns)
+    chunks = retrieve(question, session_ns=session_ns, include_public=include_public)
     retrieved = [citation(n, c) for n, c in enumerate(chunks, start=1)]
 
     # Guard 1: nothing similar enough → refuse without calling the LLM.

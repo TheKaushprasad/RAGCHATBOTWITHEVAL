@@ -88,21 +88,32 @@ def upload_chunk_count() -> int:
 
 # --- retrieval --------------------------------------------------------------------------
 
+def _rpc(name: str, params: dict) -> list[dict]:
+    return client().rpc(name, params).execute().data or []
+
+
 def match(query_embedding: list[float], k: int, query_text: str | None = None, mode: str = "vector",
-          session_ns: str | None = None) -> list[dict]:
-    """Top-k chunks from the public docs plus (if given) one user's uploads."""
+          session_ns: str | None = None, include_public: bool = True) -> list[dict]:
+    """Top-k chunks from one user's uploads (session_ns) and, if include_public, the shared docs."""
     if mode == "hybrid":
         if not query_text:
             raise ValueError("hybrid search needs query_text")
-        res = client().rpc("hybrid_search", {
-            "query_text": query_text, "query_embedding": query_embedding, "match_count": k,
-            "session_ns": session_ns,
-        }).execute()
+        name = "hybrid_search"
+        params = {"query_text": query_text, "query_embedding": query_embedding, "match_count": k, "session_ns": session_ns}
     else:
-        res = client().rpc("match_documents", {
-            "query_embedding": query_embedding, "match_count": k, "session_ns": session_ns,
-        }).execute()
-    return res.data or []
+        name = "match_documents"
+        params = {"query_embedding": query_embedding, "match_count": k, "session_ns": session_ns}
+    try:
+        return _rpc(name, {**params, "include_public": include_public})
+    except Exception as e:
+        # Databases that haven't re-run schema.sql lack include_public (PostgREST PGRST202: no matching
+        # function). Fall back to the older signature and drop shared docs ourselves.
+        if "PGRST202" not in str(e) and "include_public" not in str(e):
+            raise
+        if include_public:
+            return _rpc(name, params)
+        rows = _rpc(name, {**params, "match_count": k * 4})
+        return [r for r in rows if r.get("namespace") != PUBLIC][:k]
 
 
 # --- answer feedback --------------------------------------------------------------------

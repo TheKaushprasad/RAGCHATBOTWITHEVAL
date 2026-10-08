@@ -40,14 +40,19 @@ create index if not exists documents_expires_idx on documents (expires_at) where
 -- Dropped first because Postgres can't change a function's signature or return columns in place.
 drop function if exists match_documents(vector, int);
 drop function if exists match_documents(vector, int, text);
+drop function if exists match_documents(vector, int, text, boolean);
 drop function if exists hybrid_search(text, vector, int, int);
 drop function if exists hybrid_search(text, vector, int, int, text);
+drop function if exists hybrid_search(text, vector, int, int, text, boolean);
 
--- Pure vector search (RETRIEVAL_MODE=vector) over public docs + the caller's own uploads.
+-- Pure vector search (RETRIEVAL_MODE=vector) over the caller's own uploads (session_ns) and, when
+-- include_public is true, the shared docs. The chat app passes include_public = false (users search only
+-- their own files); the evals call it without session_ns to search the shared AI PM notes.
 create or replace function match_documents(
   query_embedding vector(768),
-  match_count     int  default 5,
-  session_ns      text default null
+  match_count     int     default 5,
+  session_ns      text    default null,
+  include_public  boolean default true
 )
 returns table (
   id bigint, source text, chunk_index int, page int, content text, metadata jsonb,
@@ -61,7 +66,7 @@ as $$
     1 - (d.embedding <=> query_embedding) as score,
     d.namespace
   from documents d
-  where (d.namespace = 'public' or d.namespace = session_ns)
+  where ((include_public and d.namespace = 'public') or d.namespace = session_ns)
     and (d.expires_at is null or d.expires_at > now())
   order by d.embedding <=> query_embedding
   limit match_count;
@@ -73,9 +78,10 @@ $$;
 create or replace function hybrid_search(
   query_text      text,
   query_embedding vector(768),
-  match_count     int  default 5,
-  rrf_k           int  default 60,
-  session_ns      text default null
+  match_count     int     default 5,
+  rrf_k           int     default 60,
+  session_ns      text    default null,
+  include_public  boolean default true
 )
 returns table (
   id bigint, source text, chunk_index int, page int, content text, metadata jsonb,
@@ -88,7 +94,7 @@ as $$
   ),
   visible as (
     select * from documents d
-    where (d.namespace = 'public' or d.namespace = session_ns)
+    where ((include_public and d.namespace = 'public') or d.namespace = session_ns)
       and (d.expires_at is null or d.expires_at > now())
   ),
   vec as (
