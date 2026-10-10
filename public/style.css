@@ -342,7 +342,7 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
 .add-doc:hover { border-color: var(--accent); background: var(--accent-soft); }
 .add-doc svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
 .side-docs .drop {
-  display: flex; flex-direction: column; gap: 4px; min-height: 0; padding: 4px; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-height: 0; padding: 4px; overflow-y: auto;
   border: 1.5px dashed transparent; border-radius: 10px; background: transparent;
 }
 .side-docs .drop.over { border-color: var(--accent); background: var(--accent-soft); }

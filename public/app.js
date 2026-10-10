@@ -91,6 +91,23 @@ function fileBadge(name) {
   return el("span", `ft ${kind}`, { pdf: "PDF", docx: "W", md: "M↓", txt: "TXT" }[kind]);
 }
 
+// PDF text keeps the page's hard line wraps. Join them back into paragraphs for reading, but keep
+// blank-line paragraph breaks, list items, table rows, headings, and lines ending a question or label.
+const KEEP_LINE = /^\s*([-*•]\s|\d+[.)]\s|[|#>])/;
+
+function reflow(text) {
+  return text
+    .split(/\n\s*\n/)
+    .map((para) => para.split("\n").reduce((out, line) => {
+      const next = line.trim();
+      if (!out) return next;
+      const prev = out.slice(out.lastIndexOf("\n") + 1);
+      if (KEEP_LINE.test(next) || /^[|#]/.test(prev) || /[?:]$/.test(prev)) return `${out}\n${next}`;
+      return /\w-$/.test(out) ? out + next : `${out} ${next}`; // re-join words hyphenated across lines
+    }, ""))
+    .join("\n\n");
+}
+
 function where(c) {
   const parts = [];
   if (c.page) parts.push(`Page ${c.page}`);
@@ -257,7 +274,7 @@ function openSources(data, selectedN) {
     const name = el("span", "src-name");
     name.append(el("b", "", c.source), el("small", "", where(c)));
     headBtn.append(el("span", "src-n", String(c.n)), fileBadge(c.source), name);
-    const passage = el("blockquote", "src-passage", c.snippet);
+    const passage = el("blockquote", "src-passage", reflow(c.snippet));
     passage.hidden = c.n !== selectedN;
     const meta = el("p", "src-meta", `Relevance ${Math.round(c.similarity * 100)}%`);
     meta.hidden = passage.hidden;
