@@ -91,17 +91,23 @@ code { font-size: 0.88em; background: var(--accent-soft); color: var(--accent-in
 
 /* --- hero --- */
 .hero { padding: 64px 0 72px; }
-.hero-grid { display: grid; gap: 48px; }
-.hero-copy { max-width: 760px; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 40px; align-items: center; }
 .pill { display: inline-block; padding: 6px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--accent-ink); background: var(--accent-soft); }
 .hero h1 { font-size: clamp(40px, 5vw, 64px); line-height: 1.04; font-weight: 800; letter-spacing: -0.04em; margin: 22px 0 20px; }
 .hero h1 .accent { color: var(--accent); }
-.lead { font-size: 19px; line-height: 1.55; color: var(--muted); max-width: 46ch; }
+.lead { font-size: 19px; line-height: 1.55; color: var(--muted); max-width: 34ch; }
 .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
 
-/* Hero screenshot: the real chat screen */
-.shot { margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-surface); background: #fff; box-shadow: var(--shadow); }
-.shot img { display: block; width: 100%; height: auto; }
+/* Hero illustration: edges fade into the page in light mode, framed as a card in dark mode */
+.art { margin: 0; }
+.art img {
+  display: block; width: 100%; height: auto;
+  -webkit-mask-image: radial-gradient(ellipse 90% 88% at 50% 50%, #000 78%, transparent 100%);
+  mask-image: radial-gradient(ellipse 90% 88% at 50% 50%, #000 78%, transparent 100%);
+}
+@media (prefers-color-scheme: dark) {
+  .art img { -webkit-mask-image: none; mask-image: none; border-radius: var(--r-surface); }
+}
 
 /* --- guarantees strip --- */
 .guarantees { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
@@ -208,7 +214,7 @@ code { font-size: 0.88em; background: var(--accent-soft); color: var(--accent-in
   .nav-links { display: none; }
   .hero { padding: 48px 0; }
   .how, .faq-grid { grid-template-columns: 1fr; gap: 40px; }
-  .hero-grid { gap: 36px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
   .how-intro { position: static; }
   .bento { grid-template-columns: 1fr 1fr; }
   .cell-wide { grid-column: 1 / -1; }
@@ -218,7 +224,6 @@ code { font-size: 0.88em; background: var(--accent-soft); color: var(--accent-in
   .section { padding: 64px 0; }
   .lead { font-size: 17px; }
   .cta-row .btn { flex: 1 1 100%; }
-  .shot img { aspect-ratio: 4 / 3; object-fit: cover; object-position: 46% 30%; }
   .guarantee-list { grid-template-columns: 1fr; }
   .guarantee-list li { padding: 18px 0; }
   .guarantee-list li + li { border-left: 0; border-top: 1px solid var(--border); }
