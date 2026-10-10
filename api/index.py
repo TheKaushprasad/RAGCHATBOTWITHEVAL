@@ -91,6 +91,8 @@ def health() -> dict:
         "embed_model": config.EMBED_MODEL,
         "retrieval_mode": config.RETRIEVAL_MODE,
         "top_k": config.TOP_K,
+        "reranker": config.RERANKER,
+        "rerank_candidates": config.RERANK_CANDIDATES,
         "min_similarity": config.MIN_SIMILARITY,
     }
 
@@ -208,7 +210,9 @@ def feedback(req: FeedbackRequest, user: dict = Depends(current_user)) -> dict:
                 "config": {
                     "provider": config.PROVIDER, "chat_model": config.CHAT_MODEL,
                     "embed_model": config.EMBED_MODEL, "retrieval_mode": config.RETRIEVAL_MODE,
-                    "top_k": config.TOP_K, "min_similarity": config.MIN_SIMILARITY,
+                    "top_k": config.TOP_K,
+        "reranker": config.RERANKER,
+        "rerank_candidates": config.RERANK_CANDIDATES, "min_similarity": config.MIN_SIMILARITY,
                     "chunk_tokens": config.CHUNK_TOKENS, "chunk_overlap": config.CHUNK_OVERLAP,
                 },
             })
