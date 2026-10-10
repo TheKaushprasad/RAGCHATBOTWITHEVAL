@@ -192,6 +192,11 @@ TOP_K=8 python eval_answers.py --out results/golden-k8
 ```bash
 RETRIEVAL_MODE=hybrid python eval_answers.py --out results/golden-hybrid
 ```
+Reranking (`rag/rerank.py`): vector search fetches 20 candidates, a reranker keeps the best `TOP_K`. `RERANKER=llm` uses the chat model; `RERANKER=cohere` uses Cohere Rerank (needs `COHERE_API_KEY`):
+```bash
+RERANKER=llm python eval_answers.py --out results/golden-rerank
+```
+On the golden set at k=3: fully correct answers went from 76% (no reranker) to 80% (Cohere Rerank 3.5) and 89% (LLM reranker), for about +1.4s median latency. Production uses `RERANKER=llm`.
 Rebuild a report from saved answers without re-asking the questions:
 ```bash
 python eval_answers.py --report-only

@@ -13,9 +13,9 @@ Writes retrieval_eval.md to results/<eval set>/ (or examples/<x>/results/).
 import argparse
 import time
 
-from rag import config
+from rag import config, rerank
 from rag.evalset import DEFAULT_EVALS, best_threshold, first_hit_rank, load_cases, results_dir, utf8_stdout
-from rag.pipeline import retrieve
+from rag.pipeline import search
 
 
 def main() -> int:
@@ -33,12 +33,13 @@ def main() -> int:
     hits, rr_sum, n_pos = 0, 0.0, 0
     pos_sims, neg_sims, lines = [], [], []
 
-    print(f"Retrieval: mode={args.mode}, k={args.k}, MIN_SIMILARITY={config.MIN_SIMILARITY}\n")
+    print(f"Retrieval: mode={args.mode}, k={args.k}, reranker={config.RERANKER}, MIN_SIMILARITY={config.MIN_SIMILARITY}\n")
     print(f"{'#':>3}  {'res':<4} {'rank':>4}  {'top sim':>7}  question")
     print("-" * 84)
     for i, case in enumerate(cases, start=1):
-        chunks = retrieve(case["question"], args.k, args.mode)
-        top = max((c["similarity"] for c in chunks), default=0.0)
+        candidates = search(case["question"], args.k, args.mode)
+        top = max((c["similarity"] for c in candidates), default=0.0)  # the refusal guard sees pre-rerank scores
+        chunks = rerank.rerank(case["question"], candidates, args.k)
         if case["answerable"]:
             n_pos += 1
             pos_sims.append(top)
@@ -80,8 +81,8 @@ def main() -> int:
     print("\n".join(summary))
 
     out_dir = results_dir(args.file)
-    (out_dir / "retrieval_eval.md").write_text(
-        f"# Retrieval eval\n\nmode=`{args.mode}` · k={args.k} · MIN_SIMILARITY={config.MIN_SIMILARITY} · "
+    (out_dir / ("retrieval_eval.md" if config.RERANKER == "none" else f"retrieval_eval_rerank-{config.RERANKER}.md")).write_text(
+        f"# Retrieval eval\n\nmode=`{args.mode}` · k={args.k} · reranker `{config.RERANKER}` · MIN_SIMILARITY={config.MIN_SIMILARITY} · "
         f"chunks {config.CHUNK_TOKENS}/{config.CHUNK_OVERLAP} · `{config.PROVIDER}:{config.EMBED_MODEL}`\n\n"
         + "\n".join(f"- {s}" for s in summary)
         + "\n\n```\n" + "\n".join(lines) + "\n```\n",

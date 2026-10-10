@@ -254,7 +254,7 @@ def write_report(records: list[dict], args, out_dir: Path) -> None:
     sections.append(f"## Failures ({len(failures)})\n\n{fail_md}")
 
     header = (f"# Answer-quality eval: `{args.file}`\n\nProvider `{config.PROVIDER}` · chat `{config.CHAT_MODEL}` · "
-              f"judge `{config.JUDGE_MODEL}` · retrieval `{config.RETRIEVAL_MODE}` k={config.TOP_K} · "
+              f"judge `{config.JUDGE_MODEL}` · retrieval `{config.RETRIEVAL_MODE}` k={config.TOP_K} · reranker `{config.RERANKER}` · "
               f"MIN_SIMILARITY={config.MIN_SIMILARITY} · chunks {config.CHUNK_TOKENS}/{config.CHUNK_OVERLAP}\n")
     (out_dir / "answer_eval.md").write_text(
         header + "\n" + "\n\n".join(sections) + f"\n\nPer-question detail: `{(out_dir / 'answers.jsonl').as_posix()}`.\n",

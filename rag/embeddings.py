@@ -14,14 +14,16 @@ def _normalize(vec: list[float]) -> list[float]:
 
 
 def _retry(fn, max_retries: int = 6):
-    """Call fn(), backing off on rate limits (429) and transient 5xx errors from either provider."""
+    """Call fn(), backing off on rate limits (429), transient 5xx errors and dropped connections."""
     delay = 2.0
     for attempt in range(max_retries):
         try:
             return fn()
         except Exception as e:
             status = getattr(e, "status_code", None) or getattr(e, "code", None)
-            transient = isinstance(status, int) and (status == 429 or status >= 500)
+            # Connection drops and timeouts have no status code (openai.APIConnectionError, httpx errors).
+            dropped = any(t in type(e).__name__ for t in ("Connection", "Timeout"))
+            transient = dropped or (isinstance(status, int) and (status == 429 or status >= 500))
             if transient and attempt < max_retries - 1:
                 time.sleep(delay)
                 delay *= 2
