@@ -4,18 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Queryva · Trusted answers from your documents</title>
-  <meta name="description" content="Queryva is a RAG chatbot that answers questions using only your documents, cites the exact passages, and says “I don’t know” when the answer isn’t there." />
+  <meta name="description" content="Queryva answers questions using only your documents, cites the exact passages, and says “I don’t know” when the answer isn’t there." />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
   <link rel="stylesheet" href="/landing.css" />
 </head>
 <body>
   <header class="nav">
     <div class="wrap nav-inner">
       <a class="logo" href="/" aria-label="Queryva home">
-        <img src="/favicon.svg" alt="" width="34" height="34" />
+        <img src="/favicon.svg" alt="" width="30" height="30" />
         <span>Queryva</span>
       </a>
       <nav class="nav-links" aria-label="Main">
@@ -28,7 +29,7 @@
       </nav>
       <div class="nav-cta">
         <a class="nav-login" href="/login/">Log in</a>
-        <a class="btn btn-primary btn-sm" href="/signup/">Try Queryva <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn btn-primary btn-sm" href="/signup/">Try Queryva</a>
       </div>
     </div>
   </header>
@@ -38,187 +39,136 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <span class="pill">RAG-Powered Document Assistant</span>
-          <h1><span class="line">Your documents.</span><br /><span class="line grad">Trusted answers.</span></h1>
-          <p class="lead">Queryva is a RAG chatbot that answers questions using only your documents. It cites the exact passages, and when the information isn’t in your files, it simply says “I don’t know.”</p>
+          <span class="pill">Document Q&amp;A with citations</span>
+          <h1>Your documents.<br /><span class="accent">Trusted answers.</span></h1>
+          <p class="lead">Ask your PDFs, Word and Markdown files anything. Every answer cites its source, or says “I don’t know.”</p>
           <div class="cta-row">
-            <a class="btn btn-primary" href="/signup/">Try Queryva <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-            <a class="btn btn-ghost" href="#how-it-works"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg> See how it works</a>
+            <a class="btn btn-primary" href="/signup/">Try Queryva <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+            <a class="btn btn-ghost" href="#how-it-works">See how it works</a>
           </div>
-          <ul class="trust">
-            <li>
-              <span class="trust-icon green"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6z"/><path d="M8.5 12l2.4 2.4 4.6-4.8"/></svg></span>
-              <span>Answers only<br />from your documents</span>
-            </li>
-            <li>
-              <span class="trust-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 12h6M10 16h6"/></svg></span>
-              <span>Cites the exact<br />passages</span>
-            </li>
-            <li>
-              <span class="trust-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
-              <span>No guessing<br />“I don’t know” instead</span>
-            </li>
-          </ul>
         </div>
 
-        <!-- App preview (a real question and answer from a user's uploaded AI PM notes) -->
-        <div class="preview-wrap" aria-hidden="true">
-          <div class="float-docs">
-            <span class="fd fd-pdf">PDF</span>
-            <span class="fd fd-w">W</span>
-            <span class="fd fd-md">M↓</span>
-            <span class="fd fd-txt">TXT</span>
-          </div>
-          <div class="preview">
-            <div class="pv-bar"><i></i><i></i><i></i></div>
-            <div class="pv-head">
-              <span class="pv-logo"><img src="/favicon.svg" alt="" width="24" height="24" /> Queryva</span>
-              <span class="pv-upload"><svg class="i" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg> Upload Documents</span>
-            </div>
-            <div class="pv-body">
-              <aside class="pv-docs">
-                <div class="pv-docs-title">Your Documents <span class="pv-plus">+</span></div>
-                <div class="pv-doc"><span class="ft pdf">PDF</span>ai-pm-notes.pdf</div>
-                <div class="pv-doc"><span class="ft docx">W</span>Company_Policy.docx</div>
-                <div class="pv-doc"><span class="ft md">M↓</span>Technical_Docs.md</div>
-                <div class="pv-doc"><span class="ft txt">TXT</span>FAQs.txt</div>
-              </aside>
-              <div class="pv-chat">
-                <div class="pv-user">What does the swiss cheese capability model mean?</div>
-                <div class="pv-bot">
-                  <img src="/favicon.svg" alt="" width="26" height="26" />
-                  <div class="pv-answer">
-                    LLMs can be very strong in some domains (like solving complex physics problems) but can fail randomly at simple tasks such as counting, spelling, or simple number comparisons. Models have “holes” in their capabilities, so tasks they might fail at need specialized tools <b>[1]</b>.
-                  </div>
-                </div>
-                <div class="pv-sources">
-                  <span class="pv-src-title">Sources</span>
-                  <div class="pv-src"><b>1</b><span>ai-pm-notes.pdf<small>Page 2</small></span></div>
-                </div>
-                <div class="pv-input">Ask a question about your documents… <span class="pv-send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg></span></div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <figure class="shot">
+          <img src="/chat-screenshot.png" width="1600" height="508" fetchpriority="high"
+               alt="The Queryva chat: the question “Explain what is a LLM?” answered from AI PM.pdf, with citation 1 opened in the Sources panel beside it." />
+        </figure>
       </div>
+    </section>
+
+    <!-- Guarantees, directly under the hero -->
+    <section class="guarantees" aria-label="What Queryva guarantees">
+      <ul class="wrap guarantee-list">
+        <li><i class="ph ph-files" aria-hidden="true"></i><span><b>Only your documents</b>No web search, no outside knowledge.</span></li>
+        <li><i class="ph ph-quotes" aria-hidden="true"></i><span><b>Every claim cited</b>Click a citation to read the passage.</span></li>
+        <li><i class="ph ph-question" aria-hidden="true"></i><span><b>No guessing</b>“I don’t know” when the files don’t say.</span></li>
+      </ul>
     </section>
 
     <!-- How it works -->
     <section id="how-it-works" class="section">
-      <div class="wrap">
-        <h2 class="section-title">How Queryva works</h2>
-        <p class="section-sub">From your documents to trusted answers, in a few simple steps.</p>
-        <ol class="steps">
-          <li class="step">
-            <div class="step-head"><span class="num">1</span><svg class="i big" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></div>
-            <h3>Ingestion</h3>
-            <p>Load PDF, Word, Markdown or text files, keep their structure, split into ~350-token chunks, embed and store in Supabase.</p>
+      <div class="wrap how">
+        <div class="how-intro">
+          <h2>How Queryva works</h2>
+          <p>Five steps between your question and an answer you can check.</p>
+        </div>
+        <ol class="flow">
+          <li>
+            <i class="ph ph-upload-simple" aria-hidden="true"></i>
+            <div><h3>Ingest</h3><p>Your files are split into 350-token chunks that keep their headings and page numbers, then embedded into a vector index.</p></div>
           </li>
-          <li class="step">
-            <div class="step-head"><span class="num">2</span><svg class="i big" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></div>
-            <h3>Retrieve</h3>
-            <p>Find the 5 most relevant chunks using semantic search, with optional hybrid keyword search.</p>
+          <li>
+            <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+            <div><h3>Search</h3><p>Semantic search pulls the 20 passages closest in meaning to your question, from your files only.</p></div>
           </li>
-          <li class="step">
-            <div class="step-head"><span class="num">3</span><svg class="i big" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v6"/><path d="M7 3v18h6"/><path d="M17 15l3 1.2v2.3c0 1.7-1.3 2.8-3 3.5-1.7-.7-3-1.8-3-3.5v-2.3z"/></svg></div>
-            <h3>Stay on topic</h3>
-            <p>If the best match is weak, answer “I don’t know” without calling the LLM.</p>
+          <li>
+            <i class="ph ph-sort-descending" aria-hidden="true"></i>
+            <div><h3>Rerank</h3><p>A model reads the question and all 20 together, scores how well each one answers it, and keeps the best 5.</p></div>
           </li>
-          <li class="step">
-            <div class="step-head"><span class="num">4</span><svg class="i big" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></div>
-            <h3>Generate with citations</h3>
-            <p>Use only the retrieved passages to write the answer, and cite every claim.</p>
+          <li>
+            <i class="ph ph-shield-check" aria-hidden="true"></i>
+            <div><h3>Check relevance</h3><p>If nothing is close enough, Queryva answers “I don’t know” before an LLM is ever called.</p></div>
           </li>
-          <li class="step">
-            <div class="step-head"><span class="num">5</span><svg class="i big" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8.5 10.5l2 2 4-4"/></svg></div>
-            <h3>Trusted answer</h3>
-            <p>Get a clear answer with clickable citations, or “I don’t know” if the documents don’t contain it.</p>
+          <li>
+            <i class="ph ph-chat-text" aria-hidden="true"></i>
+            <div><h3>Answer with citations</h3><p>The answer is written only from those passages, and every claim links back to its source.</p></div>
           </li>
         </ol>
       </div>
     </section>
 
     <!-- Measured -->
-    <section class="metrics-band">
+    <section class="section section-soft measured">
       <div class="wrap">
-        <div class="metrics-head">
-          <h2>Measured, not claimed</h2>
-          <p>Every change is scored against a 100-question golden dataset written from a 70-page set of AI PM notes.</p>
-        </div>
-        <dl class="metrics">
-          <div><dt>Correct vs. golden answers</dt><dd>88%</dd></div>
-          <div><dt>Answers supported by the passages</dt><dd>100%</dd></div>
-          <div><dt>Needed context retrieved</dt><dd>95%</dd></div>
-          <div><dt>Out-of-scope questions declined</dt><dd>4 / 4</dd></div>
+        <h2>Measured, not claimed</h2>
+        <p class="measured-sub">Every change is scored on a 100-question golden dataset written from 70 pages of AI PM notes.</p>
+        <dl class="stats">
+          <div class="stat-lead">
+            <dt>Fully correct answers</dt>
+            <dd><span class="before">80%</span><i class="ph ph-arrow-right" aria-hidden="true"></i><span data-metric="fully_correct">88%</span></dd>
+            <p>Before and after adding the reranker.</p>
+          </div>
+          <div><dt>Answers supported by the passages</dt><dd data-metric="faithfulness">100%</dd></div>
+          <div><dt>Needed context retrieved</dt><dd data-metric="recall">98%</dd></div>
+          <div><dt>Out-of-scope questions answered without guessing</dt><dd>4 of 4</dd></div>
         </dl>
-        <p class="metrics-note">LLM-judged on 96 answerable and 4 out-of-scope questions with <code>gpt-4.1-mini</code>. Methodology and every failure are in the <a href="https://github.com/TheKaushprasad/RAGCHATBOTWITHEVAL#evaluation-against-the-golden-dataset">project README</a>.</p>
+        <p class="stats-note">Judged by <code>gpt-4.1-mini</code> on 96 answerable and 4 out-of-scope questions. The method and every failure are in the <a href="https://github.com/TheKaushprasad/RAGCHATBOTWITHEVAL#evaluation-against-the-golden-dataset">project README</a>.</p>
       </div>
     </section>
 
     <!-- Features -->
     <section id="features" class="section">
       <div class="wrap">
-        <h2 class="section-title">Features</h2>
-        <p class="section-sub">Built for answers you can check, not answers you have to trust.</p>
-        <div class="cards">
-          <article class="card">
-            <span class="card-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 12h6M10 16h4"/></svg></span>
-            <h3>Clickable citations</h3>
-            <p>Every claim links to the passage it came from, with the file name and page, so you can verify it in a click.</p>
+        <h2>Answers you can check</h2>
+        <div class="bento">
+          <article class="cell cell-wide">
+            <div>
+              <h3>Clickable citations</h3>
+              <p>Every claim links to the passage it came from, with the file name and page.</p>
+            </div>
+            <div class="cite-demo" aria-hidden="true">
+              <p>LLMs need safeguards that let them admit when they don’t know an answer <b>1</b></p>
+              <div class="cite-card">
+                <span class="cite-n">1</span>
+                <span><strong>ai-pm-notes.pdf · Page 2</strong>“...specific training to allow the model to admit when it doesn't know an answer, rather than making one up confidently.”</span>
+              </div>
+            </div>
           </article>
-          <article class="card">
-            <span class="card-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.5h.01"/></svg></span>
+          <article class="cell cell-tint">
+            <i class="ph ph-question" aria-hidden="true"></i>
             <h3>“I don’t know” by design</h3>
-            <p>Two guards: an off-topic filter before the LLM, and a prompt rule that refuses when the passages don’t contain the answer.</p>
+            <p>A relevance check before the LLM, and a prompt rule that refuses when the passages don’t hold the answer.</p>
           </article>
-          <article class="card">
-            <span class="card-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span>
+          <article class="cell">
+            <i class="ph ph-upload-simple" aria-hidden="true"></i>
             <h3>Upload your own files</h3>
-            <p>Drop in PDF, Word, Markdown or text files. Headings, lists and tables are kept so citations point to the right section.</p>
+            <p>PDF, Word, Markdown or text. Headings, lists and tables survive the import.</p>
           </article>
-          <article class="card">
-            <span class="card-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
-            <h3>Your account, your history</h3>
-            <p>Sign up with email to keep every conversation and your uploaded files. Uploads are searchable only by you, on any device.</p>
+          <article class="cell">
+            <i class="ph ph-lock-simple" aria-hidden="true"></i>
+            <h3>Private to your account</h3>
+            <p>Your uploads and chat history are searchable only by you, on any device.</p>
           </article>
-          <article class="card">
-            <span class="card-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2M8.5 11h5M11 8.5v5"/></svg></span>
-            <h3>Hybrid search</h3>
-            <p>Semantic search finds meaning, keyword search finds exact terms, and Reciprocal Rank Fusion combines both rankings.</p>
-          </article>
-          <article class="card">
-            <span class="card-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+          <article class="cell cell-tint">
+            <i class="ph ph-chart-bar" aria-hidden="true"></i>
             <h3>Evaluated end to end</h3>
-            <p>Correctness, faithfulness and context recall are measured on a golden dataset, and each failure is traced to retrieval or generation.</p>
+            <p>Correctness, faithfulness and context recall are scored, and each failure is traced to retrieval or generation.</p>
           </article>
         </div>
       </div>
     </section>
 
     <!-- Technology -->
-    <section id="technology" class="tech-band">
-      <div class="wrap tech-grid">
-        <div>
-          <h2>Built with modern technology</h2>
-          <p>A simple, reliable stack for accurate, grounded answers.</p>
-        </div>
-        <ul class="tech">
-          <li>
-            <span class="tech-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c-4.2 0-4 1.8-4 1.8v2.2h4.1v.7H6.3S3.5 6.9 3.5 11.2s2.4 4.2 2.4 4.2h1.5v-2s-.1-2.4 2.4-2.4h4.1s2.3 0 2.3-2.2V4.6S16.6 2.5 12 2.5z" fill="#3776ab" stroke="none"/><path d="M12 21.5c4.2 0 4-1.8 4-1.8v-2.2h-4.1v-.7h5.8s2.8.3 2.8-4.1-2.4-4.2-2.4-4.2h-1.5v2s.1 2.4-2.4 2.4h-4.1s-2.3 0-2.3 2.2v4.2S7.4 21.5 12 21.5z" fill="#ffd43b" stroke="none"/></svg></span>
-            <span><b>FastAPI</b><small>Backend<br />Serverless on Vercel</small></span>
-          </li>
-          <li>
-            <span class="tech-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3" fill="#336791" stroke="none"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6" fill="#336791" stroke="none"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3M5 6c0 1.7 3.1 3 7 3s7-1.3 7-3" stroke="#fff" stroke-width="1.2"/></svg></span>
-            <span><b>Supabase</b><small>Postgres + pgvector<br />Database</small></span>
-          </li>
-          <li>
-            <span class="tech-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17M3.5 12h17M6 6l12 12M18 6L6 18"/></svg></span>
-            <span><b>OpenAI</b><small>Embeddings &amp; answers<br />(Gemini also supported)</small></span>
-          </li>
-          <li>
-            <span class="tech-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg></span>
-            <span><b>HTML / CSS / JS</b><small>Frontend<br />Chat, citations, upload</small></span>
-          </li>
+    <section id="technology" class="section section-soft tech-section">
+      <div class="wrap">
+        <h2>Built with</h2>
+        <p class="tech-sub">FastAPI on Vercel, Postgres with pgvector on Supabase, and OpenAI models for embeddings, reranking and answers.</p>
+        <ul class="logos">
+          <li><img src="https://cdn.simpleicons.org/python" alt="Python" width="36" height="36" loading="lazy" /></li>
+          <li><img src="https://cdn.simpleicons.org/fastapi" alt="FastAPI" width="36" height="36" loading="lazy" /></li>
+          <li><img src="https://cdn.simpleicons.org/supabase" alt="Supabase" width="36" height="36" loading="lazy" /></li>
+          <li><img src="https://cdn.simpleicons.org/postgresql" alt="PostgreSQL" width="36" height="36" loading="lazy" /></li>
+          <li><img class="mono" src="https://cdn.simpleicons.org/vercel/111318" alt="Vercel" width="36" height="36" loading="lazy" /></li>
+          <li><img src="https://cdn.simpleicons.org/javascript" alt="JavaScript" width="36" height="36" loading="lazy" /></li>
         </ul>
       </div>
     </section>
@@ -226,33 +176,20 @@
     <!-- Use cases -->
     <section id="use-cases" class="section">
       <div class="wrap">
-        <h2 class="section-title">Use cases</h2>
-        <p class="section-sub">Anywhere a wrong answer costs more than “I don’t know.”</p>
-        <div class="cards cards-4">
-          <article class="card">
-            <h3>Study notes &amp; courses</h3>
-            <p>Upload your notes and ask them questions, with the page to revise from. The answer quality above was measured on 70 pages of AI PM notes.</p>
-          </article>
-          <article class="card">
-            <h3>Internal knowledge base</h3>
-            <p>Let teams query handbooks, runbooks and wikis without hunting through folders or trusting a guess.</p>
-          </article>
-          <article class="card">
-            <h3>Policies &amp; HR documents</h3>
-            <p>Answer leave, expense and benefits questions straight from the policy, with the clause cited.</p>
-          </article>
-          <article class="card">
-            <h3>Product &amp; support docs</h3>
-            <p>Give support teams cited answers from product guides and FAQs, and an honest “not covered” when docs fall short.</p>
-          </article>
+        <h2>Where a wrong answer costs more than “I don’t know”</h2>
+        <div class="uses">
+          <div><h3>Study notes and courses</h3><p>Ask your notes questions and get the page to revise from.</p></div>
+          <div><h3>Internal knowledge base</h3><p>Query handbooks, runbooks and wikis without hunting through folders.</p></div>
+          <div><h3>Policies and HR documents</h3><p>Answer leave, expense and benefits questions with the clause cited.</p></div>
+          <div><h3>Product and support docs</h3><p>Give support teams cited answers, and an honest “not covered” when the docs fall short.</p></div>
         </div>
       </div>
     </section>
 
     <!-- FAQ -->
     <section id="faq" class="section section-soft">
-      <div class="wrap faq-wrap">
-        <h2 class="section-title">FAQ</h2>
+      <div class="wrap faq-grid">
+        <h2>FAQ</h2>
         <div class="faq">
           <details>
             <summary>What can I ask Queryva?</summary>
@@ -260,47 +197,48 @@
           </details>
           <details>
             <summary>Which file types can I upload?</summary>
-            <p>PDF, Word (.docx), Markdown and plain text, up to 4 MB each and 5 files at a time. Scanned PDFs without a text layer aren’t supported, because there is no OCR.</p>
+            <p>PDF, Word (.docx), Markdown and plain text, up to 4 MB each and 5 files in total. Scanned PDFs without a text layer aren’t supported, because there is no OCR.</p>
           </details>
           <details>
             <summary>Who can see the documents I upload?</summary>
-            <p>Only you. Uploads are stored in your account, and Queryva only ever searches your own files, never anyone else’s. They stay until you remove them from the Documents panel.</p>
+            <p>Only you. Uploads are stored in your account, and Queryva only ever searches your own files, never anyone else’s. They stay until you remove them from My documents.</p>
           </details>
           <details>
             <summary>Do I need an account?</summary>
-            <p>Yes, a free one: just an email and a password. It keeps your chat history and uploads, and lets you pick up where you left off on any device. Forgot your password? You can reset it by email from the login page.</p>
+            <p>Yes, a free one: an email and a password. It keeps your chat history and uploads on any device. You can reset a forgotten password by email from the login page.</p>
           </details>
           <details>
             <summary>What happens when the answer isn’t in my documents?</summary>
-            <p>Queryva says “I don’t know” instead of guessing. Clearly off-topic questions are filtered out before the LLM is called; for on-topic questions the documents don’t cover, the model is instructed to refuse rather than use outside knowledge.</p>
+            <p>Queryva says “I don’t know” instead of guessing. Clearly off-topic questions are caught before the LLM is called; for on-topic questions the documents don’t cover, the model is instructed to refuse rather than use outside knowledge.</p>
           </details>
           <details>
             <summary>Can Queryva still be wrong?</summary>
-            <p>Yes. It can retrieve the wrong passage or give an incomplete answer, which is why every claim is cited so you can check it. On the 100-question golden dataset, 88% of answers matched the expected answer and none contained claims unsupported by the passages.</p>
+            <p>Yes. It can pick the wrong passage or give an incomplete answer, which is why every claim is cited so you can check it. On the 100-question golden dataset, <span data-metric="fully_correct">88%</span> of answers were fully correct and none contained claims unsupported by the passages.</p>
           </details>
           <details>
             <summary>Which AI models does it use?</summary>
-            <p>OpenAI <code>text-embedding-3-small</code> for search and <code>gpt-4.1-mini</code> for answers. Google Gemini is supported as an alternative provider.</p>
+            <p>OpenAI <code>text-embedding-3-small</code> for search, and <code>gpt-4.1-mini</code> for reranking and answers. Google Gemini is supported as an alternative provider.</p>
           </details>
         </div>
       </div>
     </section>
 
     <!-- Final CTA -->
-    <section class="final-cta">
+    <section class="final">
       <div class="wrap final-inner">
-        <h2>Ask your documents something.</h2>
-        <p>Sign up free, upload a document, and start asking.</p>
-        <a class="btn btn-light" href="/signup/">Create a free account <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <div>
+          <h2>Ask your documents something.</h2>
+          <p>Free account. Upload a file and start asking.</p>
+        </div>
+        <a class="btn btn-primary" href="/signup/">Try Queryva <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
       </div>
     </section>
   </main>
 
   <footer class="footer">
     <div class="wrap footer-inner">
-      <a class="logo logo-sm" href="/"><img src="/favicon.svg" alt="" width="24" height="24" /><span>Queryva</span></a>
-      <span>RAG chatbot with citations and evals ·
-        <a href="https://github.com/TheKaushprasad/RAGCHATBOTWITHEVAL">GitHub</a></span>
+      <a class="logo logo-sm" href="/"><img src="/favicon.svg" alt="" width="22" height="22" /><span>Queryva</span></a>
+      <a href="https://github.com/TheKaushprasad/RAGCHATBOTWITHEVAL">Source on GitHub</a>
     </div>
   </footer>
 

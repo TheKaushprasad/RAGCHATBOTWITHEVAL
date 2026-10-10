@@ -8,6 +8,7 @@
   --accent: #5b4ef0;
   --accent-2: #8b5cf6;
   --accent-soft: #eeecfe;
+  --on-accent: #ffffff;
   --user: #5b4ef0;
   --user-text: #ffffff;
   --error: #b42318;
@@ -27,6 +28,7 @@
     --accent: #9b90ff;
     --accent-2: #b39aff;
     --accent-soft: #252448;
+    --on-accent: #0e0f12;
     --user: #6d61f5;
     --user-text: #ffffff;
     --error: #ff8a80;
@@ -59,7 +61,7 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
   font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
 .new-chat {
   display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border: 0; border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+  background: var(--accent); color: var(--on-accent); font-size: 14px; font-weight: 700; cursor: pointer;
 }
 .new-chat svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
 .search { display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); }
@@ -127,7 +129,7 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
   border: 1.5px dashed var(--border); border-radius: 10px; background: var(--panel);
 }
 .drop.over { border-color: var(--accent); background: var(--accent-soft); }
-.pick { padding: 7px 14px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pick { padding: 7px 14px; border: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: 13px; font-weight: 600; cursor: pointer; }
 .hint, .privacy { color: var(--muted); font-size: 13px; }
 .privacy { margin: 6px 0 0; }
 .status { margin-top: 6px; font-size: 13px; }
@@ -202,7 +204,7 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
   background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; line-height: 1.6;
   vertical-align: 1px; cursor: pointer;
 }
-.ref:hover { background: var(--accent); color: #fff; }
+.ref:hover { background: var(--accent); color: var(--on-accent); }
 
 .cites { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
 .cites:empty { display: none; }
@@ -255,7 +257,7 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
 .fb-form[hidden] { display: none; }
 .fb-form input { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; font-size: 13px; }
 .fb-form input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-.fb-form button { padding: 0 12px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.fb-form button { padding: 0 12px; border: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: 13px; font-weight: 600; cursor: pointer; }
 .fb-form button:disabled { opacity: 0.5; }
 
 /* --- composer --- */
@@ -273,7 +275,7 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
 .attach, #send { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border: 0; border-radius: 10px; cursor: pointer; }
 .attach { background: transparent; color: var(--muted); }
 .attach:hover { background: var(--accent-soft); color: var(--accent); }
-#send { background: var(--accent); color: #fff; }
+#send { background: var(--accent); color: var(--on-accent); }
 #send:disabled { opacity: 0.5; cursor: default; }
 .attach svg, #send svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .composer-hint { margin: 6px 0 0; text-align: center; font-size: 12px; color: var(--muted); }
@@ -360,8 +362,8 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
 
 /* empty state for a user with no documents */
 .empty-upload {
-  margin-top: 4px; padding: 12px 22px; border: 0; border-radius: 12px; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 10px 24px -12px rgba(91, 78, 240, 0.7);
+  margin-top: 4px; padding: 12px 22px; border: 0; border-radius: 12px; color: var(--on-accent); font-size: 15px; font-weight: 700; cursor: pointer;
+  background: var(--accent);
 }
 .empty-note { margin-top: 12px !important; font-size: 13px; }
 

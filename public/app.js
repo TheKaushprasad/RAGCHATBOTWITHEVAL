@@ -353,7 +353,7 @@ function renderFeedback(node, question, data, answerId, initialRating = 0) {
     status.textContent = "";
     try {
       await save(value);
-      status.textContent = value === 1 ? "Thanks!" : value === -1 ? "Thanks — tell us what was wrong?" : "";
+      status.textContent = value === 1 ? "Thanks!" : value === -1 ? "Thanks. What was wrong?" : "";
       if (value === -1) reason.focus();
     } catch (err) {
       rating = previous;
@@ -371,7 +371,7 @@ function renderFeedback(node, question, data, answerId, initialRating = 0) {
     try {
       await save(-1, comment);
       fbForm.hidden = true;
-      status.textContent = "Thanks — that helps improve the answers.";
+      status.textContent = "Thanks, that helps improve the answers.";
     } catch (err) {
       status.textContent = `Couldn't save feedback: ${err.message}`;
     } finally {
