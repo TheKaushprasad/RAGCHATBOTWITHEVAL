@@ -197,6 +197,15 @@ Reranking (`rag/rerank.py`): vector search fetches 20 candidates, a reranker kee
 RERANKER=llm python eval_answers.py --out results/golden-rerank
 ```
 On the golden set at k=3: fully correct answers went from 76% (no reranker) to 80% (Cohere Rerank 3.5) and 89% (LLM reranker), for about +1.4s median latency. Production uses `RERANKER=llm` with `TOP_K=5`: 80% fully correct without the reranker, 88% with it (`results/golden-rerank-k5/`).
+
+Compare query rewriting and rerankers on passage-level retrieval. A hit means a passage that contains the answer made the top k; passages are labelled once by the judge model and cached in `evals_*_qrels.json`. The local bge reranker needs `requirements-dev.txt` (CPU PyTorch: `pip install torch --index-url https://download.pytorch.org/whl/cpu`):
+```bash
+python eval.py --compare --k 5 --rerankers none,llm,bge
+```
+```bash
+python eval.py --compare --k 5 --rerankers none,llm,bge --file evals_followup.json
+```
+Results: `results/golden/retrieval_compare.md`, `results/followup/retrieval_compare.md`. MRR@5 on follow-ups: 0.69 as asked, 0.91 rewritten, 1.00 rewritten + LLM reranker (bge: 0.92). The labels come from the same model family as the LLM reranker, which may favour it.
 Rebuild a report from saved answers without re-asking the questions:
 ```bash
 python eval_answers.py --report-only

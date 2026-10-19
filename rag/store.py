@@ -89,7 +89,9 @@ def upload_chunk_count() -> int:
 # --- retrieval --------------------------------------------------------------------------
 
 def _rpc(name: str, params: dict) -> list[dict]:
-    return client().rpc(name, params).execute().data or []
+    from rag.embeddings import _retry  # dropped connections and 5xx are retried with backoff
+
+    return _retry(lambda: client().rpc(name, params).execute().data or [])
 
 
 def match(query_embedding: list[float], k: int, query_text: str | None = None, mode: str = "vector",

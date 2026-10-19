@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import uuid
@@ -12,6 +13,10 @@ from pydantic import BaseModel, Field  # noqa: E402
 
 from rag import auth, config, followup, history, pipeline, store  # noqa: E402
 from rag.uploads import UploadError, ingest_upload, user_namespace  # noqa: E402
+
+# INFO logs go to stdout, which Vercel keeps in the deployment's runtime logs.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("queryva.chat")
 
 app = FastAPI(title="Queryva")
 
@@ -111,14 +116,17 @@ def public_config() -> dict:
 def chat(req: ChatRequest, user: dict = Depends(current_user)) -> ChatResponse:
     question = req.message.strip()
     try:
-        standalone = question
+        standalone, turns = question, []
         conv_id = str(req.conversation_id) if req.conversation_id else None
         if conv_id:
             if not history.owns(user["id"], conv_id):
                 raise HTTPException(status_code=404, detail="Conversation not found.")
             # Follow-ups like "and how do you fix it?" are rewritten into a standalone question
             # so retrieval searches for the right thing.
-            standalone = followup.rewrite(question, history.recent_turns(user["id"], conv_id))
+            turns = history.recent_turns(user["id"], conv_id, n=config.REWRITE_TURNS)
+            standalone = followup.rewrite(question, turns)
+        log.info("query original=%r rewritten=%r turns=%d conversation=%s", question, standalone,
+                 len(turns), conv_id or "new")
         # Users search only their own uploads; the shared AI PM notes are for the evals and demo numbers.
         result = pipeline.answer_question(standalone, session_ns=user_namespace(user["id"]), include_public=False)
         answer_id = str(uuid.uuid4())

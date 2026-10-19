@@ -22,10 +22,11 @@ def build_prompt(question: str, chunks: list[dict]) -> str:
     return f"Context passages:\n\n{context}\n\nQuestion: {question}"
 
 
-def complete(system: str, user: str, model: str | None = None, json_mode: bool = False) -> str:
-    """One chat completion against the configured provider."""
+def complete(system: str, user: str, model: str | None = None, json_mode: bool = False,
+             provider: str | None = None) -> str:
+    """One chat completion against `provider` (default: the configured PROVIDER)."""
     model = model or config.CHAT_MODEL
-    if config.PROVIDER == "openai":
+    if (provider or config.PROVIDER) == "openai":
         kwargs = {"response_format": {"type": "json_object"}} if json_mode else {}
         res = _retry(lambda: openai_client().chat.completions.create(
             model=model,

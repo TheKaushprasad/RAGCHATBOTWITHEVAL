@@ -7,12 +7,16 @@ outrank the one that actually answers. A reranker judges the pair, which fixes m
     RERANKER=none    off (default)
     RERANKER=llm     the configured chat model scores every candidate in one call (no extra account)
     RERANKER=cohere  Cohere Rerank (needs COHERE_API_KEY)
+    RERANKER=bge     BAAI/bge-reranker-base cross-encoder, run locally with sentence-transformers.
+                     Local and evals only: PyTorch is far over Vercel's 250 MB function limit.
+                     Install with requirements-dev.txt.
 
 A failing reranker never breaks an answer: it falls back to the original vector order.
 """
 
 import json
 import sys
+from functools import lru_cache
 
 from rag import config, llm
 
@@ -45,7 +49,7 @@ def _cohere_scores(question: str, chunks: list[dict]) -> list[float]:
     res = httpx.post(
         "https://api.cohere.com/v2/rerank",
         headers={"Authorization": f"Bearer {config.COHERE_API_KEY}"},
-        json={"model": config.RERANK_MODEL, "query": question, "documents": [c["content"] for c in chunks]},
+        json={"model": config.COHERE_RERANK_MODEL, "query": question, "documents": [c["content"] for c in chunks]},
         timeout=20,
     )
     res.raise_for_status()
@@ -55,13 +59,33 @@ def _cohere_scores(question: str, chunks: list[dict]) -> list[float]:
     return scores
 
 
-def rerank(question: str, chunks: list[dict], k: int) -> list[dict]:
-    """The k best chunks for the question. Each keeps its vector `similarity` and gains `rerank_score`."""
-    if config.RERANKER == "none" or len(chunks) <= 1:
+@lru_cache(maxsize=1)
+def _bge_model():
+    from sentence_transformers import CrossEncoder  # optional dependency (requirements-dev.txt)
+
+    return CrossEncoder(config.BGE_RERANK_MODEL, max_length=512)
+
+
+def _bge_scores(question: str, chunks: list[dict]) -> list[float]:
+    return [float(s) for s in _bge_model().predict([(question, c["content"]) for c in chunks])]
+
+
+SCORERS = {"llm": _llm_scores, "cohere": _cohere_scores, "bge": _bge_scores}
+
+
+def rerank(question: str, chunks: list[dict], k: int, method: str | None = None, strict: bool = False) -> list[dict]:
+    """The k best chunks for the question. Each keeps its vector `similarity` and gains `rerank_score`.
+
+    `method` overrides RERANKER (the evals compare several in one run). `strict` raises instead of falling
+    back, so an eval never reports vector order under a reranker's name."""
+    method = method or config.RERANKER
+    if method == "none" or len(chunks) <= 1:
         return chunks[:k]
     try:
-        scores = (_cohere_scores if config.RERANKER == "cohere" else _llm_scores)(question, chunks)
+        scores = SCORERS[method](question, chunks)
     except Exception as e:  # noqa: BLE001 - reranking is an optimisation, never a reason to fail the answer
+        if strict:
+            raise
         print(f"rerank failed, using vector order: {e}", file=sys.stderr)
         return chunks[:k]
     # Stable sort: ties keep their vector-search order.

@@ -42,11 +42,21 @@ RETRIEVAL_MODE = os.environ.get("RETRIEVAL_MODE", "vector")  # "vector" or "hybr
 TOP_K = int(os.environ.get("TOP_K", "5"))
 MIN_SIMILARITY = float(os.environ.get("MIN_SIMILARITY", "0.224"))
 # Reranking (rag/rerank.py): fetch RERANK_CANDIDATES by vector search, keep the TOP_K the reranker likes best.
-RERANKER = os.environ.get("RERANKER", "none")  # "none", "llm" or "cohere"
-if RERANKER not in ("none", "llm", "cohere"):
-    raise RuntimeError(f"RERANKER must be none, llm or cohere, got {RERANKER!r}")
+RERANKER = os.environ.get("RERANKER", "none")  # "none", "llm", "cohere" or "bge" (local; not on Vercel)
+if RERANKER not in ("none", "llm", "cohere", "bge"):
+    raise RuntimeError(f"RERANKER must be none, llm, cohere or bge, got {RERANKER!r}")
 RERANK_CANDIDATES = int(os.environ.get("RERANK_CANDIDATES", "20"))
-RERANK_MODEL = os.environ.get("RERANK_MODEL", "rerank-v3.5" if RERANKER == "cohere" else CHAT_MODEL)
+# One model setting per reranker, so the evals can compare several in one run.
+RERANK_MODEL = os.environ.get("RERANK_MODEL", CHAT_MODEL)  # RERANKER=llm
+COHERE_RERANK_MODEL = os.environ.get("COHERE_RERANK_MODEL", "rerank-v3.5")
+BGE_RERANK_MODEL = os.environ.get("BGE_RERANK_MODEL", "BAAI/bge-reranker-base")
+
+# Follow-up rewriting (rag/followup.py) can use a different provider than the answers, e.g. REWRITE_PROVIDER=gemini.
+REWRITE_PROVIDER = os.environ.get("REWRITE_PROVIDER", PROVIDER)
+if REWRITE_PROVIDER not in _DEFAULTS:
+    raise RuntimeError(f"REWRITE_PROVIDER must be one of {sorted(_DEFAULTS)}, got {REWRITE_PROVIDER!r}")
+REWRITE_MODEL = os.environ.get("REWRITE_MODEL", CHAT_MODEL if REWRITE_PROVIDER == PROVIDER else _DEFAULTS[REWRITE_PROVIDER]["chat"])
+REWRITE_TURNS = int(os.environ.get("REWRITE_TURNS", "3"))
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "")
 CHUNK_TOKENS = int(os.environ.get("CHUNK_TOKENS", "350"))
 CHUNK_OVERLAP = int(os.environ.get("CHUNK_OVERLAP", "50"))

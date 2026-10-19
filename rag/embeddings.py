@@ -22,7 +22,7 @@ def _retry(fn, max_retries: int = 6):
         except Exception as e:
             status = getattr(e, "status_code", None) or getattr(e, "code", None)
             # Connection drops and timeouts have no status code (openai.APIConnectionError, httpx errors).
-            dropped = any(t in type(e).__name__ for t in ("Connection", "Timeout"))
+            dropped = any(t in type(e).__name__ for t in ("Connection", "Timeout", "Protocol", "Disconnect"))
             transient = dropped or (isinstance(status, int) and (status == 429 or status >= 500))
             if transient and attempt < max_retries - 1:
                 time.sleep(delay)

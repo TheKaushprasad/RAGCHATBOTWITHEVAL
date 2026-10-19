@@ -24,7 +24,7 @@ SUGGEST_SYSTEM = """You suggest follow-up questions for a documentation chatbot.
 - Each must be answerable from the PASSAGES, and different from the question already asked.
 - Write them the way a user would type them. No numbering, no quotes inside."""
 
-MAX_TURNS = 3  # recent exchanges used to resolve a follow-up
+MAX_TURNS = config.REWRITE_TURNS  # recent exchanges used to resolve a follow-up
 
 
 def _transcript(turns: list[tuple[str, str]]) -> str:
@@ -41,7 +41,8 @@ def rewrite(question: str, turns: list[tuple[str, str]]) -> str:
         return question
     user = f"Conversation:\n{_transcript(turns)}\n\nLatest message: {question}\n\nStandalone question:"
     try:
-        out = llm.complete(REWRITE_SYSTEM, user).strip().strip('"').strip()
+        out = llm.complete(REWRITE_SYSTEM, user, model=config.REWRITE_MODEL,
+                           provider=config.REWRITE_PROVIDER).strip().strip('"').strip()
     except Exception:
         return question  # never block an answer because the rewrite failed
     return out if 0 < len(out) <= 500 else question
