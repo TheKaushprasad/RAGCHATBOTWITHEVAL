@@ -113,6 +113,8 @@ def load(path: Path) -> Segments:
 
 
 def embed_text(source: str, chunk: Chunk) -> str:
-    # Prefixing the file name and section gives the embedding context the chunk text may lack.
+    # Prefixing the file name, section and situating sentence (rag/context.py) gives the embedding
+    # context the chunk text may lack.
     header = source + (f" — {chunk.meta['heading']}" if chunk.meta.get("heading") else "")
-    return f"{header}\n\n{chunk.text}"
+    context = chunk.meta.get("context")
+    return f"{header}\n{context}\n\n{chunk.text}" if context else f"{header}\n\n{chunk.text}"

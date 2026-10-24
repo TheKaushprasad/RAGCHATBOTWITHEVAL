@@ -301,7 +301,12 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
   margin: 0 12px 8px; padding: 10px 12px; border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
   background: var(--soft); font-size: 13px; line-height: 1.6; white-space: pre-wrap; max-height: 340px; overflow-y: auto;
 }
-.src-meta { margin: 0 12px 10px; color: var(--muted); font-size: 12px; }
+.src-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 12px 10px; color: var(--muted); font-size: 12px; }
+.src-open {
+  padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel);
+  color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.src-open:hover { border-color: var(--accent); background: var(--accent-soft); }
 
 /* --- responsive --- */
 .only-mobile { display: none; }
@@ -377,3 +382,16 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
 }
 @keyframes caret { to { visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { .msg.streaming .body::after { animation: none; } }
+
+/* document filter above the composer */
+.scope-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 auto 8px; max-width: 860px; }
+.scope-label { color: var(--muted); font-size: 12.5px; margin-right: 2px; }
+.scope-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 220px; padding: 4px 10px 4px 6px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text);
+  font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.scope-chip:first-of-type { padding-left: 10px; }
+.scope-chip span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scope-chip .ft { width: 18px; height: 18px; }
+.scope-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }

@@ -1,0 +1,24 @@
+name: health
+
+# Every hour, ask the live API whether the last 24 hours breached the alert thresholds
+# (p95 latency, error rate; see ALERT_* in rag/config.py). A breach fails this workflow,
+# and GitHub emails the repository owner about failed scheduled runs.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HEALTH_CHECK_TOKEN: ${{ secrets.HEALTH_CHECK_TOKEN }}
+      APP_URL: ${{ vars.APP_URL || 'https://ragevaltest.vercel.app' }}
+    steps:
+      - name: Check live metrics
+        if: env.HEALTH_CHECK_TOKEN != ''  # skipped until the secret is added
+        run: |
+          status=$(curl -s -o body.json -w "%{http_code}" -H "X-Check-Token: $HEALTH_CHECK_TOKEN" "$APP_URL/api/health/check?hours=24")
+          cat body.json; echo
+          if [ "$status" != "200" ]; then echo "::error::Health check returned $status"; exit 1; fi

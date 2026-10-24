@@ -75,7 +75,8 @@ def judge(case: dict, answer: str, passages: list[dict]) -> dict:
     else:
         system, label = JUDGE_OUT_OF_SCOPE, "EXPECTED BEHAVIOUR"
     user = f"QUESTION: {case['question']}\n\n{label}: {case['answer']}\n\nANSWER: {answer}\n\nPASSAGES:\n{ctx}"
-    raw = llm.complete(system, user, model=config.JUDGE_MODEL, json_mode=True)
+    raw = llm.complete(system, user, model=config.JUDGE_MODEL, json_mode=True,
+                       provider=config.JUDGE_PROVIDER)
     try:
         out = json.loads(raw[raw.find("{") : raw.rfind("}") + 1])
     except json.JSONDecodeError:
@@ -254,7 +255,7 @@ def write_report(records: list[dict], args, out_dir: Path) -> None:
     sections.append(f"## Failures ({len(failures)})\n\n{fail_md}")
 
     header = (f"# Answer-quality eval: `{args.file}`\n\nProvider `{config.PROVIDER}` · chat `{config.CHAT_MODEL}` · "
-              f"judge `{config.JUDGE_MODEL}` · retrieval `{config.RETRIEVAL_MODE}` k={config.TOP_K} · reranker `{config.RERANKER}` · "
+              f"judge `{config.JUDGE_PROVIDER}:{config.JUDGE_MODEL}` · retrieval `{config.RETRIEVAL_MODE}` k={config.TOP_K} · reranker `{config.RERANKER}` · "
               f"MIN_SIMILARITY={config.MIN_SIMILARITY} · chunks {config.CHUNK_TOKENS}/{config.CHUNK_OVERLAP}\n")
     (out_dir / "answer_eval.md").write_text(
         header + "\n" + "\n\n".join(sections) + f"\n\nPer-question detail: `{(out_dir / 'answers.jsonl').as_posix()}`.\n",

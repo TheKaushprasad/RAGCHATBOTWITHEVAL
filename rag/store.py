@@ -32,6 +32,13 @@ def existing_hashes(source: str, namespace: str = PUBLIC) -> dict[int, str]:
     return {r["chunk_index"]: r["content_hash"] for r in rows}
 
 
+def existing_contexts(source: str, namespace: str = PUBLIC) -> dict[str, str]:
+    """Situating sentences already stored for a source, keyed by chunk text (reused when the text is unchanged)."""
+    rows = (client().table(TABLE).select("content,metadata")
+            .eq("namespace", namespace).eq("source", source).execute().data)
+    return {r["content"]: (r.get("metadata") or {}).get("context", "") for r in rows if (r.get("metadata") or {}).get("context")}
+
+
 def upsert_chunks(rows: list[dict], batch_size: int = 100) -> None:
     for i in range(0, len(rows), batch_size):
         client().table(TABLE).upsert(rows[i : i + batch_size], on_conflict="namespace,source,chunk_index").execute()
@@ -95,27 +102,30 @@ def _rpc(name: str, params: dict) -> list[dict]:
 
 
 def match(query_embedding: list[float], k: int, query_text: str | None = None, mode: str = "vector",
-          session_ns: str | None = None, include_public: bool = True) -> list[dict]:
-    """Top-k chunks from one user's uploads (session_ns) and, if include_public, the shared docs."""
+          session_ns: str | None = None, include_public: bool = True,
+          sources: list[str] | None = None) -> list[dict]:
+    """Top-k chunks from one user's uploads (session_ns) and, if include_public, the shared docs.
+    `sources` limits the search to those file names."""
     if mode == "hybrid":
         if not query_text:
             raise ValueError("hybrid search needs query_text")
         name = "hybrid_search"
-        params = {"query_text": query_text, "query_embedding": query_embedding, "match_count": k, "session_ns": session_ns}
+        params = {"query_text": query_text, "query_embedding": query_embedding, "match_count": k}
     else:
         name = "match_documents"
-        params = {"query_embedding": query_embedding, "match_count": k, "session_ns": session_ns}
+        params = {"query_embedding": query_embedding, "match_count": k}
+    params.update(session_ns=session_ns, include_public=include_public)
+    if not sources:
+        return _rpc(name, params)
     try:
-        return _rpc(name, {**params, "include_public": include_public})
+        return _rpc(name, {**params, "source_filter": sources})
     except Exception as e:
-        # Databases that haven't re-run schema.sql lack include_public (PostgREST PGRST202: no matching
-        # function). Fall back to the older signature and drop shared docs ourselves.
-        if "PGRST202" not in str(e) and "include_public" not in str(e):
+        # Databases that haven't re-run schema.sql lack source_filter (PostgREST PGRST202: no matching
+        # function). Search a wider pool and filter here instead.
+        if "PGRST202" not in str(e) and "source_filter" not in str(e):
             raise
-        if include_public:
-            return _rpc(name, params)
-        rows = _rpc(name, {**params, "match_count": k * 4})
-        return [r for r in rows if r.get("namespace") != PUBLIC][:k]
+        rows = _rpc(name, {**params, "match_count": k * 6})
+        return [r for r in rows if r["source"] in sources][:k]
 
 
 # --- answer feedback --------------------------------------------------------------------

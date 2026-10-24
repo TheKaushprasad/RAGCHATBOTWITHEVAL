@@ -67,6 +67,45 @@ async function chatStream(body, onToken) {
   throw new Error("The answer was cut off. Please try again.");
 }
 
+// Files over the API's request limit: get a one-time storage URL, PUT the file there with progress,
+// then ask the API to index it.
+async function apiUploadViaStorage(file, onProgress) {
+  const start = await api("/api/uploads/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, size: file.size }),
+  });
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", start.url);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.min(0.99, e.loaded / e.total));
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
+    xhr.onerror = () => reject(new Error("Network error during upload."));
+    xhr.send(file);
+  });
+  onProgress(1); // now indexing
+  return api("/api/uploads/finish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source: start.source }),
+  });
+}
+
+// Open the user's original file in a new tab; PDFs jump to the cited page.
+async function openDocument(source, page) {
+  const tab = window.open("", "_blank"); // opened now, inside the click, so pop-up blockers allow it
+  try {
+    const { url, content_type } = await api(`/api/documents/${encodeURIComponent(source)}/open`);
+    const target = content_type === "application/pdf" && page ? `${url}#page=${page}` : url;
+    if (tab) tab.location = target;
+    else location.href = target;
+  } catch (err) {
+    tab?.close();
+    alert(err.message);
+  }
+}
+
 // Upload with progress events (fetch can't report upload progress).
 async function apiUpload(file, onProgress) {
   const auth = await token();
@@ -315,6 +354,10 @@ function openSources(data, selectedN) {
     const passage = el("blockquote", "src-passage", reflow(c.snippet));
     passage.hidden = c.n !== selectedN;
     const meta = el("p", "src-meta", `Relevance ${Math.round(c.similarity * 100)}%`);
+    const openBtn = el("button", "src-open", c.page ? `Open at page ${c.page}` : "Open document");
+    openBtn.type = "button";
+    openBtn.addEventListener("click", () => openDocument(c.source, c.page));
+    meta.append(openBtn);
     meta.hidden = passage.hidden;
     headBtn.addEventListener("click", () => {
       const open = passage.hidden;
@@ -475,7 +518,9 @@ async function ask(message) {
     // Show the answer as it's written; markdown and clickable citations are rendered once it's complete.
     const body = bot.querySelector(".body");
     let streamed = "";
-    const data = await chatStream({ message, conversation_id: conversationId }, (text) => {
+    const request = { message, conversation_id: conversationId };
+    if (selectedSources.size) request.sources = [...selectedSources];
+    const data = await chatStream(request, (text) => {
       if (!streamed) bot.classList.replace("pending", "streaming");
       streamed += text;
       body.textContent = streamed.replace(/\s*\[\d+\]/g, "");
@@ -652,7 +697,8 @@ const uploadsList = document.getElementById("uploads");
 const statusEl = document.getElementById("upload-status");
 const fileInput = document.getElementById("file");
 const drop = document.getElementById("drop");
-let maxBytes = 4 * 1024 * 1024;
+let maxBytes = 20 * 1024 * 1024;
+let directBytes = 4 * 1024 * 1024; // bigger files go straight to storage (the API request limit is ~4.5 MB)
 let uploading = false;
 const pending = new Map(); // file name -> { state, progress, error } while uploading
 
@@ -666,10 +712,42 @@ function openUploadPicker() {
   fileInput.click();
 }
 
+const selectedSources = new Set(); // empty = search every document
+
 function updateScope() {
-  document.getElementById("scope").textContent = myDocs.length
-    ? `Searching ${plural(myDocs.length, "document")}`
-    : "No documents yet. Upload one to start.";
+  const names = new Set(myDocs.map((d) => d.source));
+  for (const s of [...selectedSources]) if (!names.has(s)) selectedSources.delete(s); // removed files
+  const n = selectedSources.size;
+  document.getElementById("scope").textContent = !myDocs.length
+    ? "No documents yet. Upload one to start."
+    : n ? `Searching ${n} of ${plural(myDocs.length, "document")}` : `Searching ${plural(myDocs.length, "document")}`;
+  renderScopePicker();
+}
+
+// Chips above the composer: "All documents" or any subset of files to search.
+function renderScopePicker() {
+  const picker = document.getElementById("scope-picker");
+  picker.hidden = myDocs.length < 2;
+  if (picker.hidden) return;
+  const chip = (label, pressed, onClick, file) => {
+    const b = el("button", "scope-chip", "");
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(pressed));
+    if (file) b.append(fileBadge(file));
+    b.append(el("span", "", label));
+    b.addEventListener("click", onClick);
+    return b;
+  };
+  picker.replaceChildren(
+    el("span", "scope-label", "Search in:"),
+    chip("All documents", selectedSources.size === 0, () => { selectedSources.clear(); updateScope(); }),
+    ...myDocs.map((d) => chip(d.source, selectedSources.has(d.source), () => {
+      if (selectedSources.has(d.source)) selectedSources.delete(d.source);
+      else selectedSources.add(d.source);
+      if (selectedSources.size === myDocs.length) selectedSources.clear(); // every file = all
+      updateScope();
+    }, d.source)),
+  );
 }
 
 const X_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
@@ -743,8 +821,9 @@ function renderDocs(data) {
   uploadsList.replaceChildren(...items);
   document.getElementById("docs-count").textContent = data.uploads.length ? `(${data.uploads.length})` : "";
 
-  const { max_mb, max_files } = data.limits;
+  const { max_mb, max_files, direct_mb } = data.limits;
   maxBytes = max_mb * 1024 * 1024;
+  directBytes = (direct_mb || 4) * 1024 * 1024;
   document.getElementById("limits").textContent = `max ${max_mb} MB, ${max_files} files`;
 
   const hadNone = myDocs.length === 0;
@@ -779,7 +858,8 @@ async function uploadFiles(files) {
         continue;
       }
       try {
-        const r = await apiUpload(file, (fraction) => {
+        const upload = file.size > directBytes ? apiUploadViaStorage : apiUpload;
+        const r = await upload(file, (fraction) => {
           Object.assign(p, fraction >= 1 ? { state: "indexing", progress: 1 } : { progress: fraction });
           renderDocs(lastDocs);
         });

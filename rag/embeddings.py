@@ -2,7 +2,7 @@ import math
 import time
 from functools import lru_cache
 
-from rag import config
+from rag import config, usage
 
 BATCH_SIZE = 100
 
@@ -13,8 +13,10 @@ def _normalize(vec: list[float]) -> list[float]:
     return [v / norm for v in vec]
 
 
-def _retry(fn, max_retries: int = 6):
-    """Call fn(), backing off on rate limits (429), transient 5xx errors and dropped connections."""
+def _retry(fn, max_retries: int | None = None):
+    """Call fn(), backing off on rate limits (429), transient 5xx errors and dropped connections.
+    MAX_RETRIES attempts: fewer on Vercel, so a failing provider hands over to the fallback in time."""
+    max_retries = max_retries or config.MAX_RETRIES
     delay = 2.0
     for attempt in range(max_retries):
         try:
@@ -37,13 +39,15 @@ def _retry(fn, max_retries: int = 6):
 def openai_client():
     from openai import OpenAI
 
-    return OpenAI(api_key=config._require("OPENAI_API_KEY"), max_retries=0)
+    return OpenAI(api_key=config._require("OPENAI_API_KEY"), max_retries=0, timeout=config.LLM_TIMEOUT_S)
 
 
 def _embed_openai(texts: list[str], task_type: str) -> list[list[float]]:
     # OpenAI embeddings are symmetric, so task_type is unused.
     res = _retry(lambda: openai_client().embeddings.create(
         model=config.EMBED_MODEL, input=texts, dimensions=config.EMBED_DIM))
+    if res.usage:
+        usage.record(config.EMBED_MODEL, res.usage.total_tokens)
     return [_normalize(d.embedding) for d in sorted(res.data, key=lambda d: d.index)]
 
 

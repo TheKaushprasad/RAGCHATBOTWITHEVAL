@@ -10,7 +10,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-from rag import config
+from rag import config, context
 from rag.chunking import chunk_segments, count_tokens
 from rag.embeddings import model_id
 from rag.loaders import SUPPORTED, embed_text, load
@@ -45,6 +45,10 @@ def main() -> int:
             print(f"  {source}: no extractable text, skipped")
             continue
 
+        if not args.dry_run:
+            made = context.add_context(source, chunks, known=store.existing_contexts(source))
+            if made:
+                print(f"  {source}: wrote context for {made} chunks")
         texts = [embed_text(source, c) for c in chunks]
         # Hash includes the embedding model so switching provider/model re-embeds everything.
         hashes = [hashlib.sha256(f"{model_id()}\n{t}".encode()).hexdigest() for t in texts]

@@ -1,6 +1,6 @@
 """Per-user chat history: conversations and their messages. Every call is scoped to user_id."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from rag import store
 
@@ -96,3 +96,12 @@ def last_exchange(user_id: str, conversation_id: str) -> dict | None:
 
 def delete_all(user_id: str) -> None:
     _db().table("conversations").delete().eq("user_id", user_id).execute()
+
+
+def questions_since(user_id: str, seconds: int) -> tuple[int, str | None]:
+    """How many questions the user asked in the last `seconds`, and when the oldest of them was asked."""
+    since = (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat()
+    res = (_db().table("messages").select("created_at", count="exact")
+           .eq("user_id", user_id).eq("role", "user").gte("created_at", since)
+           .order("created_at").limit(1).execute())
+    return res.count or 0, (res.data[0]["created_at"] if res.data else None)

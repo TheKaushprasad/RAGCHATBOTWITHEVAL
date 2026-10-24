@@ -25,8 +25,10 @@ def chunk_key(c: dict) -> str:
 
 
 def qrels_path(eval_file: str) -> Path:
+    """Labels file for an eval set. A judge from another provider keeps its own labels (…_qrels_gemini.json)."""
     p = Path(eval_file)
-    return p.with_name(f"{p.stem}_qrels.json")
+    suffix = "" if config.JUDGE_PROVIDER == config.PROVIDER else f"_{config.JUDGE_PROVIDER}"
+    return p.with_name(f"{p.stem}_qrels{suffix}.json")
 
 
 def load(eval_file: str) -> dict:
@@ -42,7 +44,8 @@ def judge(case: dict, pool: list[dict]) -> dict:
     """Label a pool of candidate chunks for one case. Returns {"judged": [...keys], "relevant": [...keys]}."""
     passages = "\n\n".join(f'<passage id="{i}">\n{c["content"][:1800]}\n</passage>' for i, c in enumerate(pool, 1))
     user = f"Question: {case['question']}\n\nReference answer: {case.get('answer', '')}\n\n{passages}"
-    raw = llm.complete(JUDGE_SYSTEM, user, model=config.JUDGE_MODEL, json_mode=True)
+    raw = llm.complete(JUDGE_SYSTEM, user, model=config.JUDGE_MODEL, json_mode=True,
+                       provider=config.JUDGE_PROVIDER)
     ids = {int(i) for i in json.loads(raw).get("relevant", []) if str(i).isdigit()}
     return {
         "judged": [chunk_key(c) for c in pool],

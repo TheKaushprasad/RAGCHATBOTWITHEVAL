@@ -1,0 +1,17 @@
+body { background: var(--bg); }
+.admin { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+.admin-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+.admin-top label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+.admin-top select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
+.admin h1 { margin: 0 0 4px; color: var(--ink); font-size: 26px; }
+.admin h2 { margin: 32px 0 10px; color: var(--ink); font-size: 17px; }
+.admin-msg { color: var(--muted); }
+.admin-msg.error { color: var(--error); }
+.scroll { overflow-x: auto; }
+.grid { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.grid th, .grid td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.grid th:first-child, .grid td:first-child { text-align: left; }
+.grid th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+.grid td { color: var(--ink); }
+#overall th { width: 45%; text-align: left; color: var(--muted); font-weight: 500; font-size: 14px; }
+.admin-note { margin-top: 18px; color: var(--muted); font-size: 13px; }

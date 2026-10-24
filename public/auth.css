@@ -90,3 +90,14 @@ body.is-loading main { visibility: hidden; }
 .danger-btn { border: 0; background: var(--error); color: #fff; }
 .danger-btn:disabled, .secondary-btn:disabled { opacity: 0.6; cursor: default; }
 .link-btn { border: 0; background: none; color: var(--brand); font: inherit; font-weight: 600; cursor: pointer; }
+
+/* Continue with Google (shown only when the provider is enabled) */
+.oauth-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 11px;
+  border: 1.5px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--ink);
+  font: inherit; font-weight: 600; font-size: 15px; cursor: pointer;
+}
+.oauth-btn:hover { border-color: var(--muted); }
+.oauth-btn:disabled { opacity: 0.6; cursor: default; }
+.auth-or { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--muted); font-size: 13px; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }

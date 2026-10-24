@@ -133,6 +133,9 @@ The first version of the rewrite turned *"and what does the server expose?"* int
 
 ## Chat experience
 
+- **Streaming.** Answers appear word by word as they're written (`/api/chat/stream`, server-sent events), then re-render with formatting and clickable citations. The client falls back to `/api/chat` if streaming isn't available.
+- **Choose what to search.** With two or more files, chips above the input box limit a question to some of them ("Search in: All documents / file.pdf …").
+- **Open the source.** Each passage in the source panel has **Open at page N**, which opens the original file (PDFs at the cited page) through a short-lived signed link.
 - **Formatted answers.** Headings, lists, bold and code render properly (`public/markdown.js`), built from DOM nodes rather than HTML, so model output can't inject markup.
 - **Source panel.** Clicking a citation `[1]` or a source chip opens a side panel listing every passage the answer used: file, page or section, the full passage, and whether it came from the shared notes or your upload.
 - **Clear states.**
@@ -234,10 +237,12 @@ vercel --prod
 The tuned settings are the code defaults, so only the three keys are required. Vercel detects the FastAPI app in `api/index.py` and serves `public/` statically. Don't add an `/api` rewrite: Vercel now routes rewritten requests by their destination path, so FastAPI would see `/api/index` and return 404. Ingestion and evals run locally and are excluded from the deploy.
 
 ### Uploading your own documents
-Logged-in users can upload `.docx`, `.pdf`, `.md` or `.txt` files with the attach button or from the **Documents** panel (button or drag-and-drop).
+Logged-in users can upload `.docx`, `.pdf`, `.md` or `.txt` files with the attach button or from **My documents** in the sidebar (button or drag-and-drop). Users search only their own files.
 - **Private to the account.** Uploads are stored under the namespace `user:<user id>`, and the search functions only return shared (`public`) chunks plus the caller's own namespace. Other users can't see or delete them, and nobody can delete the shared docs through the API.
 - **Kept until removed.** Account uploads don't expire; they're deleted from the Documents panel or with the account.
-- **Cost-bounded.** 4 MB per file, 5 files per user, 150 chunks per file, and 5,000 uploaded chunks across all users (configurable through `UPLOAD_*` env vars).
+- **Originals kept.** Each file is also stored in a private Supabase Storage bucket (`documents`, path `<user id>/<file name>`). The server signs every storage URL and chooses every path, so the bucket has no client policies. `python reindex_uploads.py` re-indexes uploads from their originals after changing chunking or embeddings.
+- **Large files.** Files up to 4 MB go through the API. Larger ones (up to 20 MB, `FILE_MAX_BYTES`) go straight from the browser to storage with a one-time signed URL (`/api/uploads/start`), and the API then indexes them (`/api/uploads/finish`), so they skip Vercel's 4.5 MB request limit.
+- **Cost-bounded.** 20 MB per file, 5 files per user, 150 chunks per file, and 5,000 uploaded chunks across all users (configurable through `UPLOAD_*` and `FILE_MAX_BYTES` env vars).
 - **Same pipeline.** Uploads go through the same loaders, chunker and embedder as `ingest.py`. Word headings, lists and tables are kept. PDFs exported from Google Docs, which place every word separately, are detected and re-extracted in layout mode.
 
 ### Accounts
@@ -248,6 +253,15 @@ Supabase setup, beyond `schema.sql`:
 - Add `SUPABASE_ANON_KEY` to `.env` and to Vercel.
 
 The built-in email sender is limited to a few emails per hour. Configure custom SMTP (e.g. Resend) for real traffic.
+
+## Reliability, cost and safety
+
+- **CI eval gate.** `.github/workflows/eval.yml` compiles the Python, parses the frontend scripts, and runs `eval.py --compare --rerankers none --min 0.95` on every push: passage-level hit rate on the golden set must stay at 95% or above. It needs the `OPENAI_API_KEY`, `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` repository secrets (skipped without them).
+- **Latency per stage.** Every answer logs `timing streamed=… rewrite= search= rerank= first_token= answer= save= total=`. `python scripts/latency_report.py logs.txt` turns those lines (e.g. from `vercel logs`) into p50 / p95 per stage.
+- **Rate limits.** 60 questions per hour and 300 per day per user (`CHAT_LIMIT_PER_HOUR`, `CHAT_LIMIT_PER_DAY`), counted from the messages table; over the limit the API returns 429 with a retry time.
+- **Answer cache.** The same standalone question over the same documents and settings returns the stored answer (`rag/cache.py`, table `answer_cache`, `CACHE_TTL_HOURS`, default 7 days). A user's cache is cleared whenever they upload or remove a file.
+- **Prompt injection.** Uploaded files can contain instructions. Passages are wrapped in `<passage>` tags and marked as untrusted, the prompt says never to follow them (with a reminder after the passages), and a deterministic output guard (`pipeline.guard_output`) removes uncited sentences with links and replaces answers that leak the instructions or come back encoded. `python eval_injection.py --repeats 3` runs 8 attacks in both passage orders: safe in 42/48 runs (88%), up from 7/16 (44%) with the original prompt. The remaining failure is a planted instruction to answer in another language.
+- **Independent judge.** `JUDGE_PROVIDER=gemini` (with `GEMINI_API_KEY`) grades answers and labels passages with a different model family than the one answering; its passage labels are kept separately (`evals_*_qrels_gemini.json`).
 
 ## Project layout
 ```
@@ -264,6 +278,14 @@ rag/evalset.py       eval loading, hit logic, threshold search, results folders
 rag/auth.py          verifies Supabase access tokens
 rag/history.py       per-user conversations and messages
 rag/followup.py      follow-up rewriting and suggested questions
+rag/rerank.py        rerankers: LLM, Cohere, local bge cross-encoder
+rag/qrels.py         judged passage-level relevance labels for eval.py --compare
+rag/cache.py         per-user answer cache
+rag/files.py         original uploads in Supabase Storage (signed URLs)
+rag/context.py       contextual retrieval (off by default; see notes)
+eval_injection.py    prompt-injection eval (evals_injection.json)
+reindex_uploads.py   re-index uploads from their stored originals
+scripts/latency_report.py  p50 / p95 per stage from the API's timing logs
 ingest.py            incremental ingestion of docs/ (re-embeds only changed chunks)
 eval_answers.py      golden-dataset answer eval with LLM judge + failure diagnosis
 eval.py              retrieval eval (hit rate / MRR; needs expected_substring labels)
@@ -285,5 +307,7 @@ public/              landing page, chat (chat/), login/signup/forgot/reset pages
 - **Switching embedding model re-embeds everything.** Changing `PROVIDER` or `EMBED_MODEL` changes the embedding space; chunk hashes include the model, so `python ingest.py` re-embeds automatically.
 - **Supabase free projects pause** after about a week of inactivity.
 - **No OCR.** Scanned PDFs without a text layer aren't supported.
+- **Contextual retrieval is off.** Embedding a one-sentence situating context with each chunk (`CONTEXTUAL=on`) didn't beat rewriting + reranking on the golden set (golden MRR@5 0.984 → 0.979 with the reranker; 0.885 → 0.877 without) and adds about 12 s per upload. It may help documents whose chunks lack local context.
+- **Prompt injection is reduced, not solved.** See the injection eval above; treat uploaded files as untrusted.
 - **Follow-ups use the last 3 turns only.** References to something said much earlier in a long chat may not resolve.
 - **The rewrite adds one LLM call** (~1s) to follow-up messages; first messages don't pay it.

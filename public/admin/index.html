@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Queryva · Metrics</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/auth.css" />
+  <link rel="stylesheet" href="/admin/admin.css" />
+</head>
+<body>
+  <main class="admin">
+    <header class="admin-top">
+      <a class="auth-logo" href="/chat/"><img src="/favicon.svg" alt="" width="28" height="28" /><span>Queryva</span></a>
+      <label>Period
+        <select id="days">
+          <option value="1">Last 24 hours</option>
+          <option value="7" selected>Last 7 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+      </label>
+    </header>
+    <h1>Metrics</h1>
+    <p id="msg" class="admin-msg" role="status">Loading…</p>
+
+    <section id="report" hidden>
+      <h2>Overview</h2>
+      <table class="grid"><tbody id="overall"></tbody></table>
+
+      <h2>By day</h2>
+      <div class="scroll">
+        <table class="grid">
+          <thead><tr><th>Day</th><th>Questions</th><th>p50</th><th>p95</th><th>First word p95</th><th>Errors</th><th>Cache hits</th><th>Answered</th><th>Tokens</th><th>Cost</th></tr></thead>
+          <tbody id="days-body"></tbody>
+        </table>
+      </div>
+
+      <h2>Latency by stage</h2>
+      <table class="grid">
+        <thead><tr><th>Stage</th><th>p50</th><th>p95</th></tr></thead>
+        <tbody id="stages"></tbody>
+      </table>
+      <p class="admin-note">Cost is an estimate from token counts and the prices in <code>rag/config.py</code>. "Answered" is the share of questions answered from the documents rather than with "I don't know".</p>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

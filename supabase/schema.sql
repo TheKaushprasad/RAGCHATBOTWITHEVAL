@@ -44,6 +44,8 @@ drop function if exists match_documents(vector, int, text, boolean);
 drop function if exists hybrid_search(text, vector, int, int);
 drop function if exists hybrid_search(text, vector, int, int, text);
 drop function if exists hybrid_search(text, vector, int, int, text, boolean);
+drop function if exists match_documents(vector, int, text, boolean, text[]);
+drop function if exists hybrid_search(text, vector, int, int, text, boolean, text[]);
 
 -- Pure vector search (RETRIEVAL_MODE=vector) over the caller's own uploads (session_ns) and, when
 -- include_public is true, the shared docs. The chat app passes include_public = false (users search only
@@ -52,7 +54,8 @@ create or replace function match_documents(
   query_embedding vector(768),
   match_count     int     default 5,
   session_ns      text    default null,
-  include_public  boolean default true
+  include_public  boolean default true,
+  source_filter   text[]  default null
 )
 returns table (
   id bigint, source text, chunk_index int, page int, content text, metadata jsonb,
@@ -68,6 +71,7 @@ as $$
   from documents d
   where ((include_public and d.namespace = 'public') or d.namespace = session_ns)
     and (d.expires_at is null or d.expires_at > now())
+    and (source_filter is null or d.source = any(source_filter))
   order by d.embedding <=> query_embedding
   limit match_count;
 $$;
@@ -81,7 +85,8 @@ create or replace function hybrid_search(
   match_count     int     default 5,
   rrf_k           int     default 60,
   session_ns      text    default null,
-  include_public  boolean default true
+  include_public  boolean default true,
+  source_filter   text[]  default null
 )
 returns table (
   id bigint, source text, chunk_index int, page int, content text, metadata jsonb,
@@ -96,6 +101,7 @@ as $$
     select * from documents d
     where ((include_public and d.namespace = 'public') or d.namespace = session_ns)
       and (d.expires_at is null or d.expires_at > now())
+      and (source_filter is null or d.source = any(source_filter))
   ),
   vec as (
     select v.id, row_number() over (order by v.embedding <=> query_embedding) as rank
@@ -179,3 +185,36 @@ alter table messages enable row level security;
 
 -- Feedback now records who rated (so reopened chats show the user's earlier votes).
 alter table feedback add column if not exists user_id uuid references auth.users (id) on delete cascade;
+
+-- Answer cache (rag/cache.py): same standalone question + document filter + settings -> stored answer.
+-- Cleared per user on upload/delete; entries older than CACHE_TTL_HOURS are ignored.
+create table if not exists answer_cache (
+  user_id     uuid        not null references auth.users (id) on delete cascade,
+  key         text        not null,
+  result      jsonb       not null,
+  created_at  timestamptz not null default now(),
+  primary key (user_id, key)
+);
+alter table answer_cache enable row level security;  -- server-side only (service key); no client policies
+
+-- Per-user rate limits count recent questions.
+create index if not exists messages_user_time_idx on messages (user_id, created_at) where role = 'user';
+
+-- One row per question (rag/metrics.py): latency per stage, tokens, estimated cost, outcome.
+-- Read by the admin dashboard (/admin/) and the hourly health check.
+create table if not exists answer_metrics (
+  id             bigserial   primary key,
+  created_at     timestamptz not null default now(),
+  user_id        uuid        references auth.users (id) on delete set null,
+  streamed       boolean     not null default false,
+  cache_hit      boolean     not null default false,
+  grounded       boolean,
+  error          text,
+  tokens_in      int         not null default 0,
+  tokens_out     int         not null default 0,
+  cost_usd       numeric(12, 6) not null default 0,
+  rewrite_s      real, cache_s real, search_s real, rerank_s real,
+  first_token_s  real, answer_s real, save_s real, total_s real
+);
+create index if not exists answer_metrics_created_idx on answer_metrics (created_at);
+alter table answer_metrics enable row level security;  -- server-side only (service key); no client policies

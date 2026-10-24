@@ -4,7 +4,7 @@ import hashlib
 import re
 from pathlib import Path
 
-from rag import config, store
+from rag import config, context, store
 from rag.chunking import chunk_segments
 from rag.embeddings import embed_documents, model_id
 from rag.loaders import SUPPORTED, embed_text, load_bytes
@@ -25,15 +25,29 @@ def clean_filename(name: str) -> str:
     return f"{stem}{ext}"
 
 
-def ingest_upload(filename: str, data: bytes, namespace: str) -> dict:
+def check_new_upload(filename: str, namespace: str, size: int, max_bytes: int) -> str:
+    """Validate a file before it's uploaded or indexed. Returns the cleaned file name."""
+    source = clean_filename(filename)
+    if Path(source).suffix.lower() not in SUPPORTED:
+        raise UploadError(f"Unsupported file type. Upload one of: {', '.join(sorted(SUPPORTED))}")
+    if size > max_bytes:
+        raise UploadError(f"File is larger than {max_bytes // (1024 * 1024)} MB.")
+    existing = {d['source'] for d in store.list_sources(namespace)}
+    if source not in existing and len(existing) >= config.UPLOAD_MAX_FILES:
+        raise UploadError(f"You can have at most {config.UPLOAD_MAX_FILES} uploaded files. Remove one first.")
+    return source
+
+
+def ingest_upload(filename: str, data: bytes, namespace: str, max_bytes: int | None = None) -> dict:
     source = clean_filename(filename)
     ext = Path(source).suffix.lower()
     if ext not in SUPPORTED:
         raise UploadError(f"Unsupported file type. Upload one of: {', '.join(sorted(SUPPORTED))}")
     if not data:
         raise UploadError("The file is empty.")
-    if len(data) > config.UPLOAD_MAX_BYTES:
-        raise UploadError(f"File is larger than {config.UPLOAD_MAX_BYTES // (1024 * 1024)} MB.")
+    max_bytes = max_bytes or config.UPLOAD_MAX_BYTES
+    if len(data) > max_bytes:
+        raise UploadError(f"File is larger than {max_bytes // (1024 * 1024)} MB.")
 
     store.purge_expired()
     existing = {d["source"] for d in store.list_sources(namespace)}
@@ -52,6 +66,8 @@ def ingest_upload(filename: str, data: bytes, namespace: str) -> dict:
     if store.upload_chunk_count() + len(chunks) > config.UPLOAD_GLOBAL_MAX_CHUNKS:
         raise UploadError("The demo's upload storage is full right now. Please try again later.")
 
+    # Situating sentences improve search; capped so a large file still finishes within the API time limit.
+    context.add_context(source, chunks, budget_s=config.UPLOAD_CONTEXT_BUDGET_S)
     texts = [embed_text(source, c) for c in chunks]
     vectors = embed_documents(texts)
 

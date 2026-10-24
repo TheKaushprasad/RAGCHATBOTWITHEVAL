@@ -168,7 +168,7 @@ def compare(args) -> int:
         f"# Retrieval comparison: `{args.file}`\n\n"
         f"{n} answerable cases · `{config.PROVIDER}:{config.EMBED_MODEL}` · mode `{args.mode}` · "
         f"{pool_k} candidates reranked to top {args.k} · rewrite `{config.REWRITE_PROVIDER}:{config.REWRITE_MODEL}` · "
-        f"labels judged by `{config.JUDGE_MODEL}` ({qrels.qrels_path(args.file).name})\n\n"
+        f"labels judged by `{config.JUDGE_PROVIDER}:{config.JUDGE_MODEL}` ({qrels.qrels_path(args.file).name})\n\n"
         + "\n".join(lines) + "\n\n" + "\n".join(notes) + "\n",
         encoding="utf-8",
     )
