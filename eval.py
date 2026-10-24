@@ -173,7 +173,13 @@ def compare(args) -> int:
         encoding="utf-8",
     )
     print(f"\nReport: {out.as_posix()}")
-    return 0
+
+    # CI gate: every compared setup must keep its passage-level hit rate above --min.
+    failed = [(name, method, sum(r is not None for r in ranks) / n) for (name, method), ranks in stats.items()
+              if args.min is not None and sum(r is not None for r in ranks) / n < args.min]
+    for name, method, rate in failed:
+        print(f"FAIL: {name}/{method} hit rate {rate:.0%} < required {args.min:.0%}")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
