@@ -1,6 +1,8 @@
+import json
 import logging
 import os
 import sys
+import time
 import uuid
 from pathlib import Path
 from typing import Literal
@@ -9,14 +11,17 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))  # make `rag` importable on Vercel and under uvicorn
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile  # noqa: E402
+from fastapi.responses import StreamingResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
-from rag import auth, config, followup, history, pipeline, store  # noqa: E402
+from rag import auth, config, followup, history, llm, pipeline, store  # noqa: E402
 from rag.uploads import UploadError, ingest_upload, user_namespace  # noqa: E402
 
 # INFO logs go to stdout, which Vercel keeps in the deployment's runtime logs.
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("queryva.chat")
+for noisy in ("httpx", "httpx2", "httpcore", "hpack"):  # per-request client logs would bury ours
+    logging.getLogger(noisy).setLevel(logging.WARNING)
 
 app = FastAPI(title="Queryva")
 
@@ -112,39 +117,108 @@ def public_config() -> dict:
 
 # --- chat + history ---------------------------------------------------------------------
 
+def _begin(req: ChatRequest, user: dict, timings: dict) -> tuple[str, str, str | None]:
+    """Check ownership and rewrite a follow-up into a standalone query. Returns (question, standalone, conv_id)."""
+    question = req.message.strip()
+    standalone, turns = question, []
+    conv_id = str(req.conversation_id) if req.conversation_id else None
+    if conv_id:
+        if not history.owns(user["id"], conv_id):
+            raise HTTPException(status_code=404, detail="Conversation not found.")
+        # Follow-ups like "and how do you fix it?" are rewritten into a standalone question
+        # so retrieval searches for the right thing.
+        t = time.perf_counter()
+        turns = history.recent_turns(user["id"], conv_id, n=config.REWRITE_TURNS)
+        standalone = followup.rewrite(question, turns)
+        timings["rewrite"] = time.perf_counter() - t
+    log.info("query original=%r rewritten=%r turns=%d conversation=%s", question, standalone,
+             len(turns), conv_id or "new")
+    return question, standalone, conv_id
+
+
+def _save(user: dict, conv_id: str | None, question: str, result: dict, timings: dict) -> tuple[str, str]:
+    """Store the exchange; creates the conversation for a first message. Returns (conv_id, answer_id)."""
+    t = time.perf_counter()
+    answer_id = str(uuid.uuid4())
+    is_new = not conv_id
+    # Create the conversation only once there's an answer, so failures don't leave empty chats.
+    if is_new:
+        conv_id = history.create_conversation(user["id"], question)["id"]
+    try:
+        history.add_exchange(user["id"], conv_id, question, result, answer_id)
+    except Exception:
+        if is_new:
+            history.delete_conversation(user["id"], conv_id)
+        raise
+    timings["save"] = time.perf_counter() - t
+    return conv_id, answer_id
+
+
+def _log_timings(timings: dict, started: float, streamed: bool) -> None:
+    """One line per answer with seconds per stage; scripts/latency_report.py turns these into p50/p95."""
+    timings["total"] = time.perf_counter() - started
+    log.info("timing streamed=%s %s", streamed, " ".join(f"{k}={v:.3f}" for k, v in timings.items()))
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest, user: dict = Depends(current_user)) -> ChatResponse:
-    question = req.message.strip()
+    started, timings = time.perf_counter(), {}
     try:
-        standalone, turns = question, []
-        conv_id = str(req.conversation_id) if req.conversation_id else None
-        if conv_id:
-            if not history.owns(user["id"], conv_id):
-                raise HTTPException(status_code=404, detail="Conversation not found.")
-            # Follow-ups like "and how do you fix it?" are rewritten into a standalone question
-            # so retrieval searches for the right thing.
-            turns = history.recent_turns(user["id"], conv_id, n=config.REWRITE_TURNS)
-            standalone = followup.rewrite(question, turns)
-        log.info("query original=%r rewritten=%r turns=%d conversation=%s", question, standalone,
-                 len(turns), conv_id or "new")
+        question, standalone, conv_id = _begin(req, user, timings)
         # Users search only their own uploads; the shared AI PM notes are for the evals and demo numbers.
-        result = pipeline.answer_question(standalone, session_ns=user_namespace(user["id"]), include_public=False)
-        answer_id = str(uuid.uuid4())
-        # Create the conversation only once there's an answer, so failures don't leave empty chats.
-        if not conv_id:
-            conv_id = history.create_conversation(user["id"], question)["id"]
-        try:
-            history.add_exchange(user["id"], conv_id, question, result, answer_id)
-        except Exception:
-            if not req.conversation_id:
-                history.delete_conversation(user["id"], conv_id)
-            raise
+        result = pipeline.answer_question(standalone, session_ns=user_namespace(user["id"]), include_public=False,
+                                          timings=timings)
+        conv_id, answer_id = _save(user, conv_id, question, result, timings)
     except HTTPException:
         raise
     except Exception as e:  # quota errors, paused Supabase project
         raise upstream(e) from e
+    _log_timings(timings, started, streamed=False)
     searched_for = standalone if standalone.strip().lower() != question.lower() else None
     return ChatResponse(**result, conversation_id=conv_id, answer_id=answer_id, searched_for=searched_for)
+
+
+def _sse(event: str, data) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@app.post("/api/chat/stream")
+def chat_stream(req: ChatRequest, user: dict = Depends(current_user)) -> StreamingResponse:
+    """Same as /api/chat, but streams the answer as server-sent events:
+    `token` {"text"} while the answer is written, then `done` with the full ChatResponse, or `error` {"detail"}."""
+    started, timings = time.perf_counter(), {}
+    try:
+        question, standalone, conv_id = _begin(req, user, timings)  # errors here are plain HTTP errors
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise upstream(e) from e
+
+    def events():
+        try:
+            chunks, result = pipeline.prepare(standalone, session_ns=user_namespace(user["id"]),
+                                              include_public=False, timings=timings)
+            if result is None:
+                t, parts = time.perf_counter(), []
+                for delta in llm.stream_answer(standalone, chunks):
+                    if not parts:
+                        timings["first_token"] = time.perf_counter() - started
+                    parts.append(delta)
+                    yield _sse("token", {"text": delta})
+                timings["answer"] = time.perf_counter() - t
+                result = pipeline.finish("".join(parts), chunks)
+            new_conv, answer_id = _save(user, conv_id, question, result, timings)
+        except Exception as e:  # noqa: BLE001 - reported to the client as an event; the stream has started
+            yield _sse("error", {"detail": upstream(e).detail})
+            return
+        _log_timings(timings, started, streamed=True)
+        searched_for = standalone if standalone.strip().lower() != question.lower() else None
+        done = ChatResponse(**result, conversation_id=new_conv, answer_id=answer_id, searched_for=searched_for)
+        yield _sse("done", done.model_dump(mode="json"))
+
+    # X-Accel-Buffering stops proxies from holding the stream until it ends.
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.get("/api/conversations")

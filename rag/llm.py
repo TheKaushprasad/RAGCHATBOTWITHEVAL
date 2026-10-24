@@ -47,6 +47,33 @@ def complete(system: str, user: str, model: str | None = None, json_mode: bool =
     return (res.text or "").strip()
 
 
+def stream(system: str, user: str, model: str | None = None):
+    """Yield the completion's text as it is generated (configured provider, temperature 0)."""
+    model = model or config.CHAT_MODEL
+    if config.PROVIDER == "openai":
+        res = _retry(lambda: openai_client().chat.completions.create(
+            model=model,
+            temperature=0,
+            stream=True,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        ))
+        for part in res:
+            if part.choices and part.choices[0].delta.content:
+                yield part.choices[0].delta.content
+        return
+
+    from google.genai import types
+
+    cfg = types.GenerateContentConfig(system_instruction=system, temperature=0)
+    for part in gemini_client().models.generate_content_stream(model=model, contents=user, config=cfg):
+        if part.text:
+            yield part.text
+
+
+def stream_answer(question: str, chunks: list[dict]):
+    return stream(SYSTEM_PROMPT, build_prompt(question, chunks))
+
+
 def answer(question: str, chunks: list[dict]) -> str:
     return complete(SYSTEM_PROMPT, build_prompt(question, chunks)) or config.IDK + "."
 

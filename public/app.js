@@ -29,6 +29,44 @@ async function api(path, options = {}) {
   return data;
 }
 
+// POST to the streaming chat endpoint. Calls onToken(text) as the answer is written and resolves with the
+// final ChatResponse. Falls back to the plain endpoint if streaming isn't available.
+async function chatStream(body, onToken) {
+  const res = await fetch("/api/chat/stream", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${await token()}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) return goToLogin();
+  if (!res.ok || !res.body || !(res.headers.get("content-type") || "").includes("text/event-stream")) {
+    if (res.status === 404 || res.status === 405) {
+      return api("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    }
+    const data = await res.json().catch(() => ({}));
+    throw new Error(typeof data.detail === "string" ? data.detail : `Request failed (${res.status})`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let cut;
+    while ((cut = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, cut);
+      buffer = buffer.slice(cut + 2);
+      const event = /^event: (.*)$/m.exec(block)?.[1];
+      const data = JSON.parse(/^data: (.*)$/m.exec(block)?.[1] || "{}");
+      if (event === "token") onToken(data.text);
+      else if (event === "done") return data;
+      else if (event === "error") throw new Error(data.detail || "Something went wrong.");
+    }
+  }
+  throw new Error("The answer was cut off. Please try again.");
+}
+
 // Upload with progress events (fetch can't report upload progress).
 async function apiUpload(file, onProgress) {
   const auth = await token();
@@ -434,12 +472,16 @@ async function ask(message) {
   send.disabled = true;
 
   try {
-    const data = await api("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, conversation_id: conversationId }),
+    // Show the answer as it's written; markdown and clickable citations are rendered once it's complete.
+    const body = bot.querySelector(".body");
+    let streamed = "";
+    const data = await chatStream({ message, conversation_id: conversationId }, (text) => {
+      if (!streamed) bot.classList.replace("pending", "streaming");
+      streamed += text;
+      body.textContent = streamed.replace(/\s*\[\d+\]/g, "");
+      log.scrollTop = log.scrollHeight;
     });
-    bot.classList.remove("pending");
+    bot.classList.remove("pending", "streaming");
     renderAnswer(bot, message, data);
     renderFeedback(bot, message, data, data.answer_id);
     if (conversationId !== data.conversation_id) {
@@ -449,7 +491,7 @@ async function ask(message) {
     loadHistory(); // new chats appear, and the active one moves to the top
     if (data.grounded) setTimeout(() => showSuggestions(data.conversation_id), 0);
   } catch (err) {
-    bot.classList.remove("pending");
+    bot.classList.remove("pending", "streaming");
     bot.classList.add("error");
     bot.querySelector(".body").textContent = err.message;
   } finally {

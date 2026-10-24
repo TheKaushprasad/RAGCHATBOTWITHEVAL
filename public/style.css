@@ -368,3 +368,12 @@ body.is-loading .shell { visibility: hidden; } /* avoid a flash before the login
 .empty-note { margin-top: 12px !important; font-size: 13px; }
 
 @media (hover: none) { .doc-rm, .conv-del { opacity: 1; } }
+
+/* streaming answer: plain text with a caret until the final render */
+.msg.streaming .body { white-space: pre-wrap; }
+.msg.streaming .body::after {
+  content: ""; display: inline-block; width: 7px; height: 1.05em; margin-left: 2px; vertical-align: -2px;
+  background: var(--accent); border-radius: 1px; animation: caret 1s steps(2, start) infinite;
+}
+@keyframes caret { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .msg.streaming .body::after { animation: none; } }
