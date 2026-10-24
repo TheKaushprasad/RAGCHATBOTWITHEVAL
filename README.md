@@ -308,6 +308,7 @@ public/              landing page, chat (chat/), login/signup/forgot/reset pages
 - **Supabase free projects pause** after about a week of inactivity.
 - **No OCR.** Scanned PDFs without a text layer aren't supported.
 - **Contextual retrieval is off.** Embedding a one-sentence situating context with each chunk (`CONTEXTUAL=on`) didn't beat rewriting + reranking on the golden set (golden MRR@5 0.984 → 0.979 with the reranker; 0.885 → 0.877 without) and adds about 12 s per upload. It may help documents whose chunks lack local context.
+- **No model router.** Answering with `gpt-5.4-nano` instead of `gpt-4.1-mini` dropped fully correct answers from 89% to 73%, raised false refusals from 2% to 8% and added a hallucination, with every question type worse (results/golden-nano). Routing easy questions to it would save under $0.001 and ~0.8 s per answer, so all answers use the same model. (`gpt-4.1-nano` is retired; GPT-5-family models need `REASONING_EFFORT=none` to stay fast.)
 - **Prompt injection is reduced, not solved.** See the injection eval above; treat uploaded files as untrusted.
 - **Follow-ups use the last 3 turns only.** References to something said much earlier in a long chat may not resolve.
 - **The rewrite adds one LLM call** (~1s) to follow-up messages; first messages don't pay it.
