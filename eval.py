@@ -116,6 +116,7 @@ def compare(args) -> int:
     pool_k = config.RERANK_CANDIDATES
     stats: dict[tuple[str, str], list[int | None]] = {}
     recall_at_pool: dict[str, list[bool]] = {}
+    empty_searches = 0
 
     print(f"Compare: {len(cases)} answerable cases, {pool_k} candidates -> top {args.k}, "
           f"rerankers {methods}, mode={args.mode}\n")
@@ -125,6 +126,8 @@ def compare(args) -> int:
         if turns:
             variants["rewritten"] = followup.rewrite(case["question"], turns)
         candidates = {name: search(q, pool_k, args.mode) for name, q in variants.items()}
+        if not any(candidates.values()):
+            empty_searches += 1
 
         # Label every candidate any variant can see (once; cached in <eval>_qrels.json).
         cid = case.get("id", str(i))
@@ -152,6 +155,13 @@ def compare(args) -> int:
         time.sleep(args.delay)
 
     n = len(cases)
+    if empty_searches == n:
+        # Not a quality drop: the index looks empty. Usually SUPABASE_SERVICE_KEY holds the anon key, which
+        # row-level security blocks from the documents table without raising an error.
+        print("
+ERROR: search returned no passages for any question. Check that SUPABASE_SERVICE_KEY is the "
+              "service_role key (not the anon key) and that the documents are indexed (python ingest.py).")
+        return 2
     no_label = sum(1 for c in cases if not labels.get(c.get("id", ""), {}).get("relevant"))
     lines = [f"| query | reranker | hit rate@{args.k} | MRR@{args.k} |", "|---|---|---|---|"]
     for (name, method), ranks in stats.items():
