@@ -31,6 +31,10 @@ jobs:
       - name: Frontend scripts parse
         run: for f in public/*.js; do node --check "$f"; done
 
+      - name: Supabase settings (non-secret facts)
+        if: env.SUPABASE_SERVICE_KEY != ''
+        run: python scripts/ci_diagnose.py
+
       # Passage-level retrieval on the golden set, against the labels in evals_golden_qrels.json.
       # Reranker off, so this costs ~100 embedding calls. Fails the build below 95%.
       - name: Retrieval eval gate
