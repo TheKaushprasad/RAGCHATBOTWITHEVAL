@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import logging
 import os
@@ -119,15 +120,16 @@ def public_config() -> dict:
 
 # --- chat + history ---------------------------------------------------------------------
 
-def _check_rate_limit(user_id: str) -> None:
-    """429 once a user exceeds the hourly or daily question limit."""
+_io = ThreadPoolExecutor(max_workers=8)  # independent database reads run side by side
+
+
+def _check_rate_limit(times: list[datetime]) -> None:
+    """429 once a user exceeds the hourly or daily question limit. `times`: their recent questions, newest first."""
+    now = datetime.now(timezone.utc)
     for seconds, limit, period in ((3600, config.CHAT_LIMIT_PER_HOUR, "hour"), (86400, config.CHAT_LIMIT_PER_DAY, "day")):
-        count, oldest = history.questions_since(user_id, seconds)
-        if count >= limit:
-            wait = seconds
-            if oldest:
-                age = (datetime.now(timezone.utc) - datetime.fromisoformat(oldest.replace("Z", "+00:00"))).total_seconds()
-                wait = max(60, seconds - age)
+        window = [t for t in times if (now - t).total_seconds() < seconds]
+        if len(window) >= limit:
+            wait = max(60, seconds - (now - window[limit - 1]).total_seconds())  # until the oldest counted one ages out
             n, unit = (round(wait / 60), "minute") if wait < 5400 else (round(wait / 3600), "hour")
             when = f"{n} {unit}{'' if n == 1 else 's'}"
             raise HTTPException(status_code=429, headers={"Retry-After": str(int(wait))},
@@ -135,18 +137,24 @@ def _check_rate_limit(user_id: str) -> None:
 
 
 def _begin(req: ChatRequest, user: dict, timings: dict) -> tuple[str, str, str | None]:
-    """Check ownership and rewrite a follow-up into a standalone query. Returns (question, standalone, conv_id)."""
-    _check_rate_limit(user["id"])
+    """Rate limit, ownership and a standalone rewrite of follow-ups. Returns (question, standalone, conv_id)."""
+    t = time.perf_counter()
     question = req.message.strip()
-    standalone, turns = question, []
     conv_id = str(req.conversation_id) if req.conversation_id else None
-    if conv_id:
-        if not history.owns(user["id"], conv_id):
-            raise HTTPException(status_code=404, detail="Conversation not found.")
+    # The three reads don't depend on each other, so they run in parallel (each is a round trip to Supabase).
+    times = _io.submit(history.question_times, user["id"], 86400, max(config.CHAT_LIMIT_PER_DAY, config.CHAT_LIMIT_PER_HOUR))
+    owned = _io.submit(history.owns, user["id"], conv_id) if conv_id else None
+    recent = _io.submit(history.recent_turns, user["id"], conv_id, config.REWRITE_TURNS) if conv_id else None
+    _check_rate_limit(times.result())
+    if owned and not owned.result():
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    turns = recent.result() if recent else []
+    timings["setup"] = time.perf_counter() - t
+    standalone = question
+    if turns:
         # Follow-ups like "and how do you fix it?" are rewritten into a standalone question
         # so retrieval searches for the right thing.
         t = time.perf_counter()
-        turns = history.recent_turns(user["id"], conv_id, n=config.REWRITE_TURNS)
         standalone = followup.rewrite(question, turns)
         timings["rewrite"] = time.perf_counter() - t
     log.info("query original=%r rewritten=%r turns=%d conversation=%s", pii.redact(question), pii.redact(standalone),
@@ -154,14 +162,16 @@ def _begin(req: ChatRequest, user: dict, timings: dict) -> tuple[str, str, str |
     return question, standalone, conv_id
 
 
-def _save(user: dict, conv_id: str | None, question: str, result: dict, timings: dict) -> tuple[str, str]:
-    """Store the exchange; creates the conversation for a first message. Returns (conv_id, answer_id)."""
+def _save(user: dict, conv_id: str | None, question: str, result: dict, timings: dict,
+          new_conv_id: str | None = None, answer_id: str | None = None) -> tuple[str, str]:
+    """Store the exchange; creates the conversation (with `new_conv_id` if given) for a first message.
+    Returns (conv_id, answer_id)."""
     t = time.perf_counter()
-    answer_id = str(uuid.uuid4())
+    answer_id = answer_id or str(uuid.uuid4())
     is_new = not conv_id
     # Create the conversation only once there's an answer, so failures don't leave empty chats.
     if is_new:
-        conv_id = history.create_conversation(user["id"], question)["id"]
+        conv_id = history.create_conversation(user["id"], question, new_conv_id)["id"]
     try:
         history.add_exchange(user["id"], conv_id, question, result, answer_id)
     except Exception:
@@ -257,18 +267,28 @@ def chat_stream(req: ChatRequest, user: dict = Depends(current_user)) -> Streami
                     yield _sse("token", {"text": delta})
                 timings["answer"] = time.perf_counter() - t
                 result = pipeline.finish("".join(parts), chunks)
-                cache.put(user["id"], cache_key, result)
-            new_conv, answer_id = _save(user, conv_id, question, result, timings)
         except Exception as e:  # noqa: BLE001 - reported to the client as an event; the stream has started
             timings["total"] = time.perf_counter() - started
             metrics.save(user["id"], timings, totals, streamed=True, grounded=None, error=type(e).__name__)
             yield _sse("error", {"detail": upstream(e).detail})
             return
+
+        # Ids are chosen here so the client gets the complete answer before anything is written; the
+        # conversation, cache entry and metrics are saved after the done event.
+        new_conv, answer_id = conv_id or str(uuid.uuid4()), str(uuid.uuid4())
         _log_timings(timings, started, streamed=True)
         searched_for = standalone if standalone.strip().lower() != question.lower() else None
         done = ChatResponse(**result, conversation_id=new_conv, answer_id=answer_id, searched_for=searched_for)
         yield _sse("done", done.model_dump(mode="json"))
-        metrics.save(user["id"], timings, totals, streamed=True, grounded=result["grounded"])  # after the client has it
+        try:
+            _save(user, conv_id, question, result, timings, new_conv_id=new_conv, answer_id=answer_id)
+        except Exception as e:  # noqa: BLE001 - the client already has the answer; record the failure
+            print(f"[queryva] saving the exchange failed after the answer was sent: {type(e).__name__}: {e}", file=sys.stderr)
+            metrics.save(user["id"], timings, totals, streamed=True, grounded=result["grounded"], error=f"save:{type(e).__name__}")
+            return
+        if not timings.get("cache_hit"):
+            cache.put(user["id"], cache_key, result)
+        metrics.save(user["id"], timings, totals, streamed=True, grounded=result["grounded"])
 
     # X-Accel-Buffering stops proxies from holding the stream until it ends.
     return StreamingResponse(events(), media_type="text/event-stream",

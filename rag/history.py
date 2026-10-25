@@ -13,10 +13,12 @@ def _db():
     return store.client()
 
 
-def create_conversation(user_id: str, first_message: str) -> dict:
+def create_conversation(user_id: str, first_message: str, conversation_id: str | None = None) -> dict:
+    """`conversation_id` lets the caller choose the id up front (the streaming chat sends it before saving)."""
     title = " ".join(first_message.split())
     title = title if len(title) <= 60 else title[:57].rstrip() + "…"
-    return _db().table("conversations").insert({"user_id": user_id, "title": title}).execute().data[0]
+    row = {"user_id": user_id, "title": title, **({"id": conversation_id} if conversation_id else {})}
+    return _db().table("conversations").insert(row).execute().data[0]
 
 
 def owns(user_id: str, conversation_id: str) -> bool:
@@ -98,10 +100,10 @@ def delete_all(user_id: str) -> None:
     _db().table("conversations").delete().eq("user_id", user_id).execute()
 
 
-def questions_since(user_id: str, seconds: int) -> tuple[int, str | None]:
-    """How many questions the user asked in the last `seconds`, and when the oldest of them was asked."""
+def question_times(user_id: str, seconds: int, limit: int) -> list[datetime]:
+    """When the user asked their most recent questions (newest first, at most `limit`, within `seconds`).
+    One query serves both the hourly and the daily rate limit."""
     since = (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat()
-    res = (_db().table("messages").select("created_at", count="exact")
-           .eq("user_id", user_id).eq("role", "user").gte("created_at", since)
-           .order("created_at").limit(1).execute())
-    return res.count or 0, (res.data[0]["created_at"] if res.data else None)
+    rows = (_db().table("messages").select("created_at").eq("user_id", user_id).eq("role", "user")
+            .gte("created_at", since).order("created_at", desc=True).limit(limit).execute().data)
+    return [datetime.fromisoformat(r["created_at"].replace("Z", "+00:00")) for r in rows]
