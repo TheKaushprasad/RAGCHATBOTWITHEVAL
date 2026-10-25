@@ -158,8 +158,7 @@ def compare(args) -> int:
     if empty_searches == n:
         # Not a quality drop: the index looks empty. Usually SUPABASE_SERVICE_KEY holds the anon key, which
         # row-level security blocks from the documents table without raising an error.
-        print("
-ERROR: search returned no passages for any question. Check that SUPABASE_SERVICE_KEY is the "
+        print("\nERROR: search returned no passages for any question. Check that SUPABASE_SERVICE_KEY is the "
               "service_role key (not the anon key) and that the documents are indexed (python ingest.py).")
         return 2
     no_label = sum(1 for c in cases if not labels.get(c.get("id", ""), {}).get("relevant"))
