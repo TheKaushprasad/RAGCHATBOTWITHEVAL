@@ -38,3 +38,9 @@ try:
     print(f"shared chunks visible: {n}")
 except Exception as e:  # noqa: BLE001
     print(f"query failed: {type(e).__name__}: {str(e)[:200]}")
+
+# In GitHub Actions, repeat the facts as an annotation so they're visible without opening the log.
+if os.environ.get("GITHUB_ACTIONS"):
+    visible = locals().get("n", "query failed")
+    print(f"::notice title=Supabase settings::key role={role}; project ref={host.split('.')[0] if host else 'missing'}; "
+          f"shared chunks visible={visible}")
