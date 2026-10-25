@@ -7,7 +7,12 @@ the key can see. Never prints the key or the full URL.
 import base64
 import json
 import os
+import sys
+from pathlib import Path
 from urllib.parse import urlparse
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # run from anywhere: make `rag` importable
+from rag import config, store  # noqa: E402  (also loads .env locally)
 
 key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
 url = os.environ.get("SUPABASE_URL", "").strip()
@@ -29,8 +34,6 @@ host = urlparse(url).hostname or ""
 print(f"SUPABASE_URL project ref: {host.split('.')[0] if host else 'missing'}")
 
 try:
-    from rag import store
-
     n = store.client().table("documents").select("id", count="exact").eq("namespace", "public").limit(1).execute().count
     print(f"shared chunks visible: {n}")
 except Exception as e:  # noqa: BLE001
