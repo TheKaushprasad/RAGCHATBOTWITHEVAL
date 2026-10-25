@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:  # run by hand from the Actions tab
 
 jobs:
   checks:
